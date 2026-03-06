@@ -4,12 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { motion } from 'motion/react';
 import { 
-  Briefcase, 
-  Users, 
-  Globe, 
   ArrowRight, 
-  CheckCircle, 
-  Building2,
   Quote
 } from 'lucide-react';
 import { MOCK_PLACEMENTS } from '@/lib/mock-data';

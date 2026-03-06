@@ -7,8 +7,6 @@ import {
   ChevronLeft, 
   ChevronRight, 
   Clock, 
-  Video, 
-  MapPin, 
   ExternalLink,
   Calendar as CalendarIcon
 } from 'lucide-react';

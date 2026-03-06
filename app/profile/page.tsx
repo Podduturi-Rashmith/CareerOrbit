@@ -8,9 +8,7 @@ import {
   Mail, 
   GraduationCap, 
   BookOpen, 
-  Calendar,
-  Shield,
-  Edit2
+  Shield
 } from 'lucide-react';
 
 export default function ProfilePage() {

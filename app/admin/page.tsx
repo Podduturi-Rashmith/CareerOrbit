@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
-import { MOCK_STUDENTS, MOCK_APPLICATIONS, Student, JobApplication } from '@/lib/mock-data';
+import { MOCK_STUDENTS, MOCK_APPLICATIONS } from '@/lib/mock-data';
 import { 
   Users, 
   Briefcase, 
@@ -10,12 +10,10 @@ import {
   Search, 
   MoreVertical, 
   UserPlus,
-  Calendar,
   Clock,
   FileText,
   CheckCircle2,
   XCircle,
-  AlertCircle,
   Edit2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -218,7 +216,7 @@ export default function AdminDashboard() {
       {/* Modals Simulation */}
       <AnimatePresence>
         {showAddStudent && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div key="add-student-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -264,7 +262,7 @@ export default function AdminDashboard() {
         )}
 
         {showAddApplication && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div key="add-application-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
