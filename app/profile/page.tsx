@@ -29,7 +29,6 @@ export default function ProfilePage() {
                 <User className="w-12 h-12" />
               </div>
               <h2 className="text-xl font-bold text-slate-900">{student.name}</h2>
-              <p className="text-sm text-slate-500">{student.studentId}</p>
               
               <div className="mt-6 p-3 bg-slate-50 rounded-xl border border-slate-100">
                 <p className="text-xs text-slate-500 italic">

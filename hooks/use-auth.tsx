@@ -2,18 +2,13 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { MOCK_ADMINS, MOCK_STUDENTS } from '@/lib/mock-data';
+import type { AuthUser } from '@/lib/auth/types';
 
-interface User {
-  id: string;
-  studentId: string;
-  name: string;
-  role: 'student' | 'admin';
-}
+type User = AuthUser;
 
 interface AuthContextType {
   user: User | null;
-  login: (studentId: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -27,18 +22,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    const initAuth = () => {
-      const storedUser = localStorage.getItem('jobtrack_user');
-      if (storedUser) {
-        try {
-          setUser(JSON.parse(storedUser));
-        } catch (e) {
-          console.error('Failed to parse stored user', e);
+    const initAuth = async () => {
+      try {
+        const response = await fetch('/api/auth/me', { method: 'GET', credentials: 'include' });
+        if (response.ok) {
+          const data = await response.json();
+          setUser(data.user);
+        } else {
+          setUser(null);
         }
+      } catch {
+        setUser(null);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
-    initAuth();
+
+    initAuth().catch(() => {
+      setUser(null);
+      setIsLoading(false);
+    });
   }, []);
 
   useEffect(() => {
@@ -47,29 +50,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, isLoading, pathname, router]);
 
-  const login = async (studentId: string, password: string) => {
-    // Mock login logic
-    const admin = MOCK_ADMINS.find(a => a.adminId === studentId && password === 'admin');
-    const student = MOCK_STUDENTS.find(s => s.studentId === studentId && password === 'password');
+  const login = async (identifier: string, password: string) => {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ identifier, password }),
+    });
 
-    if (admin) {
-      const adminUser: User = { id: admin.id, studentId: admin.adminId, name: admin.name, role: 'admin' };
-      setUser(adminUser);
-      localStorage.setItem('jobtrack_user', JSON.stringify(adminUser));
-      router.push('/dashboard');
-    } else if (student) {
-      const studentUser: User = { id: student.id, studentId: student.studentId, name: student.name, role: 'student' };
-      setUser(studentUser);
-      localStorage.setItem('jobtrack_user', JSON.stringify(studentUser));
-      router.push('/dashboard');
-    } else {
+    if (!response.ok) {
       throw new Error('Invalid credentials');
     }
+
+    const data = await response.json();
+    setUser(data.user);
+    router.push('/dashboard');
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
     setUser(null);
-    localStorage.removeItem('jobtrack_user');
     router.push('/login');
   };
 

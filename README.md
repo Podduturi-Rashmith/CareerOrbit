@@ -15,6 +15,21 @@ View your app in AI Studio: https://ai.studio/apps/f50f6f21-cfc1-4453-bb96-6ee74
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
+2. Configure [.env.local](.env.local):
+   - `GEMINI_API_KEY`
+   - `DATABASE_URL`
+   - `SESSION_SECRET`
+3. Generate Prisma client:
+   `npm run db:generate`
+4. Run migrations:
+   `npm run db:migrate`
+5. Seed starter users:
+   `npm run db:seed`
+6. Run the app:
    `npm run dev`
+
+## Account Flows
+
+- Students can now self-register from the landing page (`/`) and are automatically signed in.
+- Existing users can sign in from `/login`.
+- Seeded test users still work after running `npm run db:seed`.

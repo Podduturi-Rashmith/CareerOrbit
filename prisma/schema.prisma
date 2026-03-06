@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  STUDENT
+  ADMIN
+}
+
+enum ApplicationStatus {
+  APPLIED
+  SCREENING_CALL
+  INTERVIEW
+  ASSESSMENT
+  REJECTED
+  OFFER
+}
+
+model User {
+  id           String        @id @default(cuid())
+  name         String
+  email        String        @unique
+  role         UserRole
+  passwordHash String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  student      Student?
+  admin        Admin?
+  sessions     Session[]
+  applications Application[] @relation("StudentApplications")
+}
+
+model Student {
+  id             String @id @default(cuid())
+  userId         String @unique
+  major          String
+  graduationYear Int
+  user           User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Admin {
+  id      String @id @default(cuid())
+  userId  String @unique
+  adminId String @unique
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Application {
+  id              String            @id @default(cuid())
+  studentUserId   String
+  companyName     String
+  jobRole         String
+  status          ApplicationStatus
+  resumeUrl       String?
+  applicationDate DateTime
+  notes           String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  student         User              @relation("StudentApplications", fields: [studentUserId], references: [id], onDelete: Cascade)
+
+  @@index([studentUserId])
+  @@unique([studentUserId, companyName, jobRole])
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  userId     String
+  expiresAt  DateTime
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}

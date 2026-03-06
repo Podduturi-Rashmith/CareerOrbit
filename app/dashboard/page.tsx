@@ -1,117 +1,124 @@
 'use client';
 
 import React from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
-import { MOCK_APPLICATIONS } from '@/lib/mock-data';
-import { 
-  Briefcase, 
-  Calendar, 
-  PhoneCall, 
-  ClipboardCheck, 
-  ArrowUpRight,
-  Download,
-  ExternalLink
-} from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'motion/react';
+import { ArrowUpRight, BriefcaseBusiness, CalendarClock, CircleDotDashed, ExternalLink, Trophy } from 'lucide-react';
+import DashboardLayout from '@/components/DashboardLayout';
+import { MOCK_APPLICATIONS } from '@/lib/mock-data';
+import { useAuth } from '@/hooks/use-auth';
 
-const StatusBadge = ({ status }: { status: string }) => {
-  const colors: Record<string, string> = {
-    'Applied': 'bg-blue-50 text-blue-700 border-blue-100',
-    'Screening Call': 'bg-purple-50 text-purple-700 border-purple-100',
-    'Interview': 'bg-amber-50 text-amber-700 border-amber-100',
-    'Assessment': 'bg-indigo-50 text-indigo-700 border-indigo-100',
-    'Rejected': 'bg-red-50 text-red-700 border-red-100',
-    'Offer': 'bg-emerald-50 text-emerald-700 border-emerald-100',
-  };
-
-  return (
-    <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${colors[status] || 'bg-slate-50 text-slate-700 border-slate-100'}`}>
-      {status}
-    </span>
-  );
+const statusStyles: Record<string, string> = {
+  Applied: 'bg-sky-100 text-sky-800 border-sky-200',
+  'Screening Call': 'bg-cyan-100 text-cyan-800 border-cyan-200',
+  Interview: 'bg-amber-100 text-amber-800 border-amber-200',
+  Assessment: 'bg-violet-100 text-violet-800 border-violet-200',
+  Rejected: 'bg-rose-100 text-rose-800 border-rose-200',
+  Offer: 'bg-emerald-100 text-emerald-800 border-emerald-200',
 };
 
+function StatusPill({ status }: { status: string }) {
+  return <span className={`rounded-full px-3 py-1 text-xs font-semibold border ${statusStyles[status] || 'bg-slate-100 text-slate-700 border-slate-200'}`}>{status}</span>;
+}
+
 export default function DashboardPage() {
-  const stats = [
-    { name: 'Total Applications', value: MOCK_APPLICATIONS.length, icon: Briefcase, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { name: 'Interviews Scheduled', value: MOCK_APPLICATIONS.filter(a => a.status === 'Interview').length, icon: Calendar, color: 'text-amber-600', bg: 'bg-amber-50' },
-    { name: 'Screening Calls', value: MOCK_APPLICATIONS.filter(a => a.status === 'Screening Call').length, icon: PhoneCall, color: 'text-purple-600', bg: 'bg-purple-50' },
-    { name: 'Assessments Pending', value: MOCK_APPLICATIONS.filter(a => a.status === 'Assessment').length, icon: ClipboardCheck, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-  ];
-
-  const recentApplications = MOCK_APPLICATIONS.slice(0, 5);
-
   return (
     <DashboardLayout>
-      <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl font-display font-bold text-slate-900">Welcome back, Alex!</h1>
-          <p className="text-slate-500">Here&apos;s what&apos;s happening with your job search.</p>
-        </div>
+      <DashboardContent />
+    </DashboardLayout>
+  );
+}
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat, index) => (
-            <motion.div
-              key={stat.name}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className={`p-2 rounded-xl ${stat.bg}`}>
-                  <stat.icon className={`w-6 h-6 ${stat.color}`} />
-                </div>
-                <span className="text-xs font-medium text-slate-400">This month</span>
-              </div>
-              <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
-              <p className="text-sm text-slate-500">{stat.name}</p>
-            </motion.div>
-          ))}
-        </div>
+function DashboardContent() {
+  const { user } = useAuth();
+  const applications = MOCK_APPLICATIONS;
 
-        {/* Recent Applications */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-slate-900">Recent Applications</h2>
-            <Link href="/applications" className="text-sm font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
+  const stats = [
+    { label: 'Total Applications', value: applications.length, icon: BriefcaseBusiness, tone: 'from-sky-600 to-sky-500' },
+    { label: 'Screening + Interviews', value: applications.filter((a) => a.status === 'Screening Call' || a.status === 'Interview').length, icon: CalendarClock, tone: 'from-teal-700 to-teal-600' },
+    { label: 'Assessments', value: applications.filter((a) => a.status === 'Assessment').length, icon: CircleDotDashed, tone: 'from-violet-700 to-violet-600' },
+    { label: 'Offers', value: applications.filter((a) => a.status === 'Offer').length, icon: Trophy, tone: 'from-emerald-700 to-emerald-600' },
+  ];
+
+  const upcoming = applications.find((a) => a.upcomingEvent);
+  const recentApplications = applications.slice(0, 6);
+
+  return (
+    <div className="space-y-8">
+      <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-900 text-white p-8 md:p-10">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(20,184,166,0.22),transparent_40%),radial-gradient(circle_at_85%_30%,rgba(245,158,11,0.18),transparent_35%)]" />
+        <div className="relative flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-300 font-semibold">Student Workspace</p>
+            <h1 className="mt-3 text-3xl md:text-4xl font-display font-black tracking-tight">Welcome back, {user?.name || 'Student'}</h1>
+            <p className="mt-3 text-slate-300 max-w-2xl">
+              Stay consistent. Keep interviews prepared, follow up on screenings, and move each application to the next stage.
+            </p>
+          </div>
+          <div className="rounded-2xl bg-white/10 border border-white/20 px-5 py-4">
+            <p className="text-xs uppercase tracking-widest text-slate-300 font-semibold">Next Priority</p>
+            <p className="mt-2 font-bold text-white">{upcoming ? `${upcoming.companyName} ${upcoming.upcomingEvent?.type}` : 'No event scheduled'}</p>
+            <p className="text-sm text-slate-300 mt-1">{upcoming?.upcomingEvent?.date?.replace('T', ' ').replace('Z', ' UTC') || 'Add a new calendar event to stay on track.'}</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+        {stats.map((item, index) => (
+          <motion.article
+            key={item.label}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.06 }}
+            className="panel-surface rounded-2xl p-5"
+          >
+            <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${item.tone} text-white flex items-center justify-center`}>
+              <item.icon className="w-5 h-5" />
+            </div>
+            <p className="mt-4 text-3xl font-black text-slate-900">{item.value}</p>
+            <p className="text-xs uppercase tracking-wide text-slate-500 font-semibold mt-1">{item.label}</p>
+          </motion.article>
+        ))}
+      </section>
+
+      <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="xl:col-span-2 panel-surface rounded-3xl overflow-hidden">
+          <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">Recent Applications</h2>
+              <p className="text-sm text-slate-500">Your latest progress across companies.</p>
+            </div>
+            <Link href="/applications" className="inline-flex items-center gap-1 text-sm font-semibold text-teal-700 hover:text-teal-800">
               View all <ArrowUpRight className="w-4 h-4" />
             </Link>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left">
               <thead>
-                <tr className="bg-slate-50/50">
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Company</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Role</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Date</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Action</th>
+                <tr className="bg-slate-50/70">
+                  <th className="px-6 py-4 text-xs uppercase tracking-wider text-slate-500 font-bold">Company</th>
+                  <th className="px-6 py-4 text-xs uppercase tracking-wider text-slate-500 font-bold">Role</th>
+                  <th className="px-6 py-4 text-xs uppercase tracking-wider text-slate-500 font-bold">Status</th>
+                  <th className="px-6 py-4 text-xs uppercase tracking-wider text-slate-500 font-bold">Applied On</th>
+                  <th className="px-6 py-4 text-xs uppercase tracking-wider text-slate-500 font-bold text-right">Open</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-200">
                 {recentApplications.map((app) => (
-                  <tr key={app.id} className="hover:bg-slate-50 transition-colors group">
+                  <tr key={app.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-500 font-bold text-xs uppercase">
-                          {app.companyName.charAt(0)}
-                        </div>
-                        <span className="font-medium text-slate-900">{app.companyName}</span>
+                        <div className="w-9 h-9 rounded-lg bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center">{app.companyName.charAt(0)}</div>
+                        <span className="font-semibold text-slate-900">{app.companyName}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{app.jobRole}</td>
+                    <td className="px-6 py-4 text-sm text-slate-700">{app.jobRole}</td>
                     <td className="px-6 py-4">
-                      <StatusBadge status={app.status} />
+                      <StatusPill status={app.status} />
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-500">{app.applicationDate}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">{app.applicationDate}</td>
                     <td className="px-6 py-4 text-right">
-                      <Link 
-                        href={`/applications/${app.id}`}
-                        className="p-2 text-slate-400 hover:text-indigo-600 transition-colors inline-block"
-                      >
+                      <Link href={`/applications/${app.id}`} className="inline-flex p-2 rounded-lg text-slate-400 hover:text-teal-700 hover:bg-teal-50">
                         <ExternalLink className="w-4 h-4" />
                       </Link>
                     </td>
@@ -121,7 +128,22 @@ export default function DashboardPage() {
             </table>
           </div>
         </div>
-      </div>
-    </DashboardLayout>
+
+        <aside className="space-y-6">
+          <div className="panel-surface rounded-3xl p-6">
+            <h3 className="font-bold text-slate-900">This Week Plan</h3>
+            <ul className="mt-4 space-y-3 text-sm text-slate-700">
+              <li className="rounded-xl border border-slate-200 bg-white p-3">Prepare STAR stories for behavioral rounds.</li>
+              <li className="rounded-xl border border-slate-200 bg-white p-3">Follow up on applications older than 10 days.</li>
+              <li className="rounded-xl border border-slate-200 bg-white p-3">Practice one timed assessment before Friday.</li>
+            </ul>
+          </div>
+          <div className="rounded-3xl border border-teal-200 bg-teal-50 p-6">
+            <p className="text-xs font-bold uppercase tracking-wider text-teal-800">Focus Signal</p>
+            <p className="mt-2 text-sm text-teal-900">You have strong momentum. Keep screening and interview pipelines active to maintain conversion.</p>
+          </div>
+        </aside>
+      </section>
+    </div>
   );
 }

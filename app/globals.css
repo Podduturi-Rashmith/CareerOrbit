@@ -1,1 +1,30 @@
 @import "tailwindcss";
+
+:root {
+  --brand-ink: #0f172a;
+  --brand-canvas: #f4f7fb;
+  --brand-panel: #ffffff;
+  --brand-line: #dbe3ef;
+  --brand-accent: #0f766e;
+  --brand-accent-soft: #ccfbf1;
+  --brand-warm: #b45309;
+}
+
+body {
+  background: radial-gradient(circle at 10% -10%, #dbeafe 0%, transparent 38%),
+    radial-gradient(circle at 110% 10%, #d1fae5 0%, transparent 35%),
+    var(--brand-canvas);
+  color: var(--brand-ink);
+}
+
+.panel-surface {
+  background: color-mix(in oklab, white 92%, #e2e8f0 8%);
+  border: 1px solid var(--brand-line);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.05);
+}
+
+.grid-pattern {
+  background-image: linear-gradient(to right, rgba(15, 23, 42, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15, 23, 42, 0.08) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
