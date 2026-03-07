@@ -3,7 +3,6 @@
 import React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
-import { MOCK_APPLICATIONS } from '@/lib/mock-data';
 import { 
   ArrowLeft, 
   Building2, 
@@ -18,6 +17,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
+import type { StudentApplicationDto } from '@/lib/applications/serialize';
 
 const StatusBadge = ({ status }: { status: string }) => {
   const colors: Record<string, string> = {
@@ -40,8 +40,40 @@ export default function ApplicationDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
-  
-  const app = MOCK_APPLICATIONS.find(a => a.id === id);
+
+  const [app, setApp] = React.useState<StudentApplicationDto | null>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const loadApplication = async () => {
+      try {
+        const response = await fetch(`/api/student/applications/${id}`, { credentials: 'include' });
+        if (!response.ok) {
+          setApp(null);
+          return;
+        }
+        const data = await response.json();
+        setApp(data.application || null);
+      } catch {
+        setApp(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadApplication().catch(() => {
+      setApp(null);
+      setLoading(false);
+    });
+  }, [id]);
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="text-center py-20 text-slate-500">Loading application...</div>
+      </DashboardLayout>
+    );
+  }
 
   if (!app) {
     return (

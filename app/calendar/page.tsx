@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
-import { MOCK_APPLICATIONS } from '@/lib/mock-data';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -10,11 +9,12 @@ import {
   ExternalLink,
   Calendar as CalendarIcon
 } from 'lucide-react';
-import { 
-  format, 
-  startOfMonth, 
-  endOfMonth, 
-  startOfWeek, 
+import {
+  format,
+  addDays,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
   endOfWeek, 
   eachDayOfInterval, 
   isSameMonth, 
@@ -22,28 +22,96 @@ import {
   addMonths, 
   subMonths 
 } from 'date-fns';
+import type { CalendarEventType } from '@/lib/applications/serialize';
+
+interface CalendarEvent {
+  id: string;
+  company: string;
+  type: CalendarEventType;
+  date: string;
+  link?: string;
+  prep?: string;
+  studentName?: string;
+  studentEmail?: string;
+}
+
+type DateRangeFilter = 'all' | '7' | '30' | '90';
 
 export default function CalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [viewerRole, setViewerRole] = useState<'student' | 'admin'>('student');
+  const [studentFilter, setStudentFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | CalendarEventType>('all');
+  const [dateRangeFilter, setDateRangeFilter] = useState<DateRangeFilter>('all');
 
-  const events = MOCK_APPLICATIONS
-    .filter(app => app.upcomingEvent)
-    .map(app => ({
-      id: app.id,
-      company: app.companyName,
-      type: app.upcomingEvent!.type,
-      date: new Date(app.upcomingEvent!.date),
-      link: app.upcomingEvent!.meetingLink,
-      prep: app.upcomingEvent!.prepNotes,
-    }));
+  React.useEffect(() => {
+    const loadEvents = async () => {
+      try {
+        const response = await fetch('/api/student/calendar', { credentials: 'include' });
+        if (!response.ok) throw new Error('Failed to load events');
+        const data = await response.json();
+        setEvents(data.events || []);
+        setViewerRole(data.viewerRole === 'admin' ? 'admin' : 'student');
+      } catch {
+        setEvents([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadEvents().catch(() => {
+      setEvents([]);
+      setLoading(false);
+    });
+  }, []);
+
+  const studentOptions = React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const event of events) {
+      if (event.studentEmail && event.studentName) {
+        map.set(event.studentEmail, event.studentName);
+      }
+    }
+    return Array.from(map.entries())
+      .map(([email, name]) => ({ email, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [events]);
+
+  const filteredEvents = React.useMemo(() => {
+    if (viewerRole !== 'admin') return events;
+
+    const now = new Date();
+    const upperBound =
+      dateRangeFilter === 'all' ? null : addDays(now, Number.parseInt(dateRangeFilter, 10));
+
+    return events.filter((event) => {
+      if (studentFilter !== 'all' && event.studentEmail !== studentFilter) return false;
+      if (typeFilter !== 'all' && event.type !== typeFilter) return false;
+
+      if (upperBound) {
+        const eventDate = new Date(event.date);
+        if (eventDate < now || eventDate > upperBound) return false;
+      }
+
+      return true;
+    });
+  }, [dateRangeFilter, events, studentFilter, typeFilter, viewerRole]);
 
   const renderHeader = () => {
     return (
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-display font-bold text-slate-900">Your Schedule</h1>
-          <p className="text-slate-500">Track your interviews and screening calls.</p>
+          <h1 className="text-2xl font-display font-bold text-slate-900">
+            {viewerRole === 'admin' ? 'Admin Calendar' : 'Your Schedule'}
+          </h1>
+          <p className="text-slate-500">
+            {viewerRole === 'admin'
+              ? 'Track interviews, screening calls, and assessments across all students.'
+              : 'Track your interviews, screening calls, and assessments.'}
+          </p>
         </div>
         <div className="flex items-center gap-4 bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
           <button 
@@ -61,6 +129,73 @@ export default function CalendarPage() {
           >
             <ChevronRight className="w-5 h-5 text-slate-600" />
           </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderAdminFilters = () => {
+    if (viewerRole !== 'admin') return null;
+
+    return (
+      <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-3">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <span className="inline-flex items-center rounded-full bg-slate-100 border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700">
+            {filteredEvents.length} events found
+          </span>
+          <button
+            onClick={() => {
+              setStudentFilter('all');
+              setTypeFilter('all');
+              setDateRangeFilter('all');
+            }}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Reset Filters
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <label className="text-xs font-semibold text-slate-600">
+            Student
+            <select
+              value={studentFilter}
+              onChange={(e) => setStudentFilter(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700"
+            >
+              <option value="all">All Students</option>
+              {studentOptions.map((student) => (
+                <option key={student.email} value={student.email}>
+                  {student.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs font-semibold text-slate-600">
+            Event Type
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value as 'all' | CalendarEventType)}
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700"
+            >
+              <option value="all">All Types</option>
+              <option value="Interview">Interview</option>
+              <option value="Screening">Screening</option>
+              <option value="Assessment">Assessment</option>
+            </select>
+          </label>
+          <label className="text-xs font-semibold text-slate-600">
+            Date Range
+            <select
+              value={dateRangeFilter}
+              onChange={(e) => setDateRangeFilter(e.target.value as DateRangeFilter)}
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700"
+            >
+              <option value="all">All Upcoming</option>
+              <option value="7">Next 7 Days</option>
+              <option value="30">Next 30 Days</option>
+              <option value="90">Next 90 Days</option>
+            </select>
+          </label>
         </div>
       </div>
     );
@@ -93,7 +228,7 @@ export default function CalendarPage() {
     return (
       <div className="grid grid-cols-7 gap-px bg-slate-200 border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
         {calendarDays.map((day, i) => {
-          const dayEvents = events.filter(event => isSameDay(event.date, day));
+          const dayEvents = filteredEvents.filter((event) => isSameDay(new Date(event.date), day));
           const isSelected = isSameDay(day, selectedDate);
           const isCurrentMonth = isSameMonth(day, monthStart);
 
@@ -123,6 +258,7 @@ export default function CalendarPage() {
                     }`}
                   >
                     <span className="font-bold">{event.type}</span>: {event.company}
+                    {viewerRole === 'admin' && event.studentName ? ` (${event.studentName})` : ''}
                   </div>
                 ))}
               </div>
@@ -133,13 +269,14 @@ export default function CalendarPage() {
     );
   };
 
-  const selectedDayEvents = events.filter(event => isSameDay(event.date, selectedDate));
+  const selectedDayEvents = filteredEvents.filter((event) => isSameDay(new Date(event.date), selectedDate));
 
   return (
     <DashboardLayout>
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         <div className="lg:col-span-3">
           {renderHeader()}
+          {renderAdminFilters()}
           {renderDays()}
           {renderCells()}
         </div>
@@ -164,13 +301,17 @@ export default function CalendarPage() {
                       </span>
                       <div className="flex items-center gap-1 text-slate-400">
                         <Clock className="w-3 h-3" />
-                        <span className="text-xs">{format(event.date, 'h:mm a')}</span>
+                        <span className="text-xs">{format(new Date(event.date), 'h:mm a')}</span>
                       </div>
                     </div>
                     
                     <div>
                       <h3 className="font-bold text-slate-900">{event.company}</h3>
-                      <p className="text-xs text-slate-500">Job Application Event</p>
+                      <p className="text-xs text-slate-500">
+                        {viewerRole === 'admin' && event.studentName
+                          ? `Student: ${event.studentName}${event.studentEmail ? ` (${event.studentEmail})` : ''}`
+                          : 'Job Application Event'}
+                      </p>
                     </div>
 
                     {event.link && (
@@ -197,7 +338,7 @@ export default function CalendarPage() {
             ) : (
               <div className="text-center py-10">
                 <CalendarIcon className="w-10 h-10 text-slate-200 mx-auto mb-2" />
-                <p className="text-sm text-slate-400">No events scheduled for this day.</p>
+                <p className="text-sm text-slate-400">{loading ? 'Loading events...' : 'No events scheduled for this day.'}</p>
               </div>
             )}
           </div>

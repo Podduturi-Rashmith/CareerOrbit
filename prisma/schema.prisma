@@ -21,6 +21,12 @@ enum ApplicationStatus {
   OFFER
 }
 
+enum UpcomingEventType {
+  SCREENING
+  INTERVIEW
+  ASSESSMENT
+}
+
 model User {
   id           String        @id @default(cuid())
   name         String
@@ -33,6 +39,7 @@ model User {
   admin        Admin?
   sessions     Session[]
   applications Application[] @relation("StudentApplications")
+  tailoredResumes TailoredResume[] @relation("TailoredResumeOwner")
 }
 
 model Student {
@@ -57,6 +64,10 @@ model Application {
   jobRole         String
   status          ApplicationStatus
   resumeUrl       String?
+  upcomingEventType UpcomingEventType?
+  upcomingEventDate DateTime?
+  meetingLink     String?
+  prepNotes       String?
   applicationDate DateTime
   notes           String?
   createdAt       DateTime          @default(now())
@@ -78,4 +89,55 @@ model Session {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+model JobListing {
+  id            String   @id @default(cuid())
+  source        String
+  externalId    String
+  title         String
+  company       String
+  location      String?
+  roleCategory  String
+  workMode      String?
+  description   String
+  applyUrl      String
+  postedAt      DateTime
+  fetchedAt     DateTime @default(now())
+  isNew         Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  tailoredResumes TailoredResume[]
+
+  @@unique([source, externalId])
+  @@index([roleCategory])
+  @@index([postedAt])
+}
+
+model JobFetchRun {
+  id          String   @id @default(cuid())
+  provider    String
+  status      String
+  fetchedCount Int
+  newCount    Int
+  startedAt   DateTime @default(now())
+  finishedAt  DateTime?
+  error       String?
+}
+
+model TailoredResume {
+  id            String   @id @default(cuid())
+  jobId          String
+  studentEmail   String
+  studentName    String
+  roleCategory   String
+  summary        String
+  generatedById  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  job            JobListing @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  generatedBy    User? @relation("TailoredResumeOwner", fields: [generatedById], references: [id], onDelete: SetNull)
+
+  @@index([jobId])
+  @@index([studentEmail])
 }

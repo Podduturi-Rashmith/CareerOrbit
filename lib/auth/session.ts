@@ -8,7 +8,14 @@ const SESSION_COOKIE_NAME = 'careerorbit_session';
 const SESSION_TTL_DAYS = 7;
 
 function getSessionSecret() {
-  return process.env.SESSION_SECRET || 'dev-only-session-secret-change-me';
+  const secret = process.env.SESSION_SECRET;
+  if (secret) return secret;
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('SESSION_SECRET is required in production.');
+  }
+
+  return 'dev-only-session-secret-change-me';
 }
 
 function hashToken(token: string) {

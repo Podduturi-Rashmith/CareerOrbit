@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { motion } from 'motion/react';
 import { ArrowUpRight, BriefcaseBusiness, CalendarClock, CircleDotDashed, ExternalLink, Trophy } from 'lucide-react';
 import DashboardLayout from '@/components/DashboardLayout';
-import { MOCK_APPLICATIONS } from '@/lib/mock-data';
 import { useAuth } from '@/hooks/use-auth';
+import type { StudentApplicationDto } from '@/lib/applications/serialize';
 
 const statusStyles: Record<string, string> = {
   Applied: 'bg-sky-100 text-sky-800 border-sky-200',
@@ -31,7 +31,28 @@ export default function DashboardPage() {
 
 function DashboardContent() {
   const { user } = useAuth();
-  const applications = MOCK_APPLICATIONS;
+  const [applications, setApplications] = React.useState<StudentApplicationDto[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const loadApplications = async () => {
+      try {
+        const response = await fetch('/api/student/applications', { credentials: 'include' });
+        if (!response.ok) throw new Error('Failed to load applications');
+        const data = await response.json();
+        setApplications(data.applications || []);
+      } catch {
+        setApplications([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadApplications().catch(() => {
+      setApplications([]);
+      setLoading(false);
+    });
+  }, []);
 
   const stats = [
     { label: 'Total Applications', value: applications.length, icon: BriefcaseBusiness, tone: 'from-sky-600 to-sky-500' },
@@ -124,6 +145,13 @@ function DashboardContent() {
                     </td>
                   </tr>
                 ))}
+                {!loading && recentApplications.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-10 text-center text-sm text-slate-500">
+                      No applications found for this account yet.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

@@ -2,14 +2,13 @@
 
 import React from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
-import { MOCK_APPLICATIONS } from '@/lib/mock-data';
 import { 
   Download,
   ExternalLink,
   Filter,
-  Search
 } from 'lucide-react';
 import Link from 'next/link';
+import type { StudentApplicationDto } from '@/lib/applications/serialize';
 
 const StatusBadge = ({ status }: { status: string }) => {
   const colors: Record<string, string> = {
@@ -29,6 +28,29 @@ const StatusBadge = ({ status }: { status: string }) => {
 };
 
 export default function ApplicationsPage() {
+  const [applications, setApplications] = React.useState<StudentApplicationDto[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const loadApplications = async () => {
+      try {
+        const response = await fetch('/api/student/applications', { credentials: 'include' });
+        if (!response.ok) throw new Error('Failed to load applications');
+        const data = await response.json();
+        setApplications(data.applications || []);
+      } catch {
+        setApplications([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadApplications().catch(() => {
+      setApplications([]);
+      setLoading(false);
+    });
+  }, []);
+
   return (
     <DashboardLayout>
       <div className="space-y-8">
@@ -60,7 +82,7 @@ export default function ApplicationsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {MOCK_APPLICATIONS.map((app) => (
+                {applications.map((app) => (
                   <tr key={app.id} className="hover:bg-slate-50 transition-colors group">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -77,7 +99,7 @@ export default function ApplicationsPage() {
                     <td className="px-6 py-4">
                       <button className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-2 py-1 rounded-md border border-indigo-100">
                         <Download className="w-3 h-3" />
-                        Resume.pdf
+                        {app.resumeUrl ? 'Resume' : 'No Resume'}
                       </button>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-500">{app.applicationDate}</td>
@@ -91,6 +113,13 @@ export default function ApplicationsPage() {
                     </td>
                   </tr>
                 ))}
+                {!loading && applications.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-10 text-center text-sm text-slate-500">
+                      No applications found for this account yet.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

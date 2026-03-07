@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs');
-const { PrismaClient, ApplicationStatus, UserRole } = require('@prisma/client');
+const { PrismaClient, ApplicationStatus, UpcomingEventType, UserRole } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
@@ -73,6 +73,10 @@ async function seedApplications(studentUserId) {
       status: ApplicationStatus.INTERVIEW,
       applicationDate: new Date('2024-03-01'),
       notes: 'Strong focus on React and Tailwind.',
+      upcomingEventType: UpcomingEventType.INTERVIEW,
+      upcomingEventDate: new Date('2024-03-10T14:00:00Z'),
+      meetingLink: 'https://zoom.us/j/123456789',
+      prepNotes: 'Review system design and React hooks.',
     },
     {
       companyName: 'DataFlow',
@@ -86,6 +90,9 @@ async function seedApplications(studentUserId) {
       jobRole: 'Fullstack Engineer',
       status: ApplicationStatus.SCREENING_CALL,
       applicationDate: new Date('2024-02-28'),
+      upcomingEventType: UpcomingEventType.SCREENING,
+      upcomingEventDate: new Date('2024-03-08T10:00:00Z'),
+      meetingLink: 'https://meet.google.com/abc-defg-hij',
     },
     {
       companyName: 'InnovateAI',
@@ -114,6 +121,10 @@ async function seedApplications(studentUserId) {
         status: item.status,
         applicationDate: item.applicationDate,
         notes: item.notes || null,
+        upcomingEventType: item.upcomingEventType || null,
+        upcomingEventDate: item.upcomingEventDate || null,
+        meetingLink: item.meetingLink || null,
+        prepNotes: item.prepNotes || null,
       },
       create: {
         studentUserId,
@@ -122,6 +133,10 @@ async function seedApplications(studentUserId) {
         status: item.status,
         applicationDate: item.applicationDate,
         notes: item.notes || null,
+        upcomingEventType: item.upcomingEventType || null,
+        upcomingEventDate: item.upcomingEventDate || null,
+        meetingLink: item.meetingLink || null,
+        prepNotes: item.prepNotes || null,
       },
     });
   }
@@ -145,8 +160,8 @@ async function main() {
   });
 
   await upsertAdmin({
-    name: 'Jane Smith',
-    email: 'jane.admin@example.com',
+    name: 'Rashmith Reddy Podduturi',
+    email: 'rashmith.admin@example.com',
     adminId: 'ADM001',
     password: 'admin',
   });
