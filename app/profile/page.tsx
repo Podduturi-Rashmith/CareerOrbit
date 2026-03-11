@@ -31,7 +31,7 @@ function ProfileContent() {
     adminId: string | null;
   } | null>(null);
   const [loading, setLoading] = React.useState(true);
-  const student = profile?.role === 'student' ? profile : null;
+  const isStudent = profile?.role === 'student';
   const isAdmin = user?.role === 'admin';
 
   React.useEffect(() => {
@@ -111,14 +111,14 @@ function ProfileContent() {
                     <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Major</p>
                     <div className="flex items-center gap-2 text-slate-900 font-medium">
                       <BookOpen className="w-4 h-4 text-slate-400" />
-                      {student?.major || (loading ? 'Loading...' : 'Not available')}
+                      {isStudent ? profile.major : (loading ? 'Loading...' : 'Not available')}
                     </div>
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Graduation Year</p>
                     <div className="flex items-center gap-2 text-slate-900 font-medium">
                       <GraduationCap className="w-4 h-4 text-slate-400" />
-                      {student?.graduationYear || (loading ? 'Loading...' : 'Not available')}
+                      {isStudent ? profile.graduationYear : (loading ? 'Loading...' : 'Not available')}
                     </div>
                   </div>
                 </>

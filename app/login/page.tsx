@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { AuthProvider } from '@/hooks/use-auth';
 import Link from 'next/link';
-import { Briefcase, Lock, User } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { Briefcase, CheckCircle2, Chrome, Lock, User } from 'lucide-react';
 import { motion } from 'motion/react';
 
 function LoginPageContent() {
@@ -12,7 +13,25 @@ function LoginPageContent() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
   const { login } = useAuth();
+  const searchParams = useSearchParams();
+
+  React.useEffect(() => {
+    const verified = searchParams.get('verified');
+    const oauth = searchParams.get('oauth');
+    if (verified === '1') {
+      setNotice('Email verified. You can sign in now.');
+    } else if (verified === '0') {
+      setNotice('Verification link expired or invalid. Please request a new link.');
+    }
+    if (oauth === 'failed') {
+      setError('Google sign-in failed. Please try again.');
+    } else if (oauth === 'blocked') {
+      setError('This email is linked to an admin. Please sign in with admin credentials.');
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,11 +39,22 @@ function LoginPageContent() {
     setIsSubmitting(true);
     try {
       await login(identifier, password);
-    } catch {
-      setError('Invalid email/admin ID or password');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Invalid email/admin ID or password');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const resendVerification = async () => {
+    if (!identifier) return;
+    setResendStatus('sending');
+    await fetch('/api/auth/resend-verification', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: identifier }),
+    });
+    setResendStatus('sent');
   };
 
   return (
@@ -42,11 +72,42 @@ function LoginPageContent() {
           <p className="text-slate-500 mt-2">Sign in to track your applications</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="space-y-4">
+          <a
+            href="/api/auth/google"
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold hover:bg-slate-50 transition-colors"
+          >
+            <Chrome className="w-4 h-4 text-slate-600" />
+            Continue with Google
+          </a>
+          <div className="flex items-center gap-3 text-xs text-slate-400">
+            <span className="flex-1 h-px bg-slate-200" />
+            or sign in with email
+            <span className="flex-1 h-px bg-slate-200" />
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6 mt-4">
+          {notice && (
+            <div className="p-3 bg-emerald-50 text-emerald-700 text-sm rounded-lg border border-emerald-100 flex items-start gap-2">
+              <CheckCircle2 className="w-4 h-4 mt-0.5 text-emerald-600" />
+              <span>{notice}</span>
+            </div>
+          )}
           {error && (
             <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100">
               {error}
             </div>
+          )}
+          {error.includes('Email not verified') && (
+            <button
+              type="button"
+              onClick={resendVerification}
+              disabled={resendStatus === 'sending'}
+              className="w-full py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-70"
+            >
+              {resendStatus === 'sent' ? 'Verification email sent' : resendStatus === 'sending' ? 'Sending...' : 'Resend verification email'}
+            </button>
           )}
 
           <div>

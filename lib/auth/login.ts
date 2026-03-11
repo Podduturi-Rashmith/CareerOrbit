@@ -1,16 +1,15 @@
 import bcrypt from 'bcryptjs';
-import { UserRole } from '@prisma/client';
 import type { AuthUser } from '@/lib/auth/types';
-import { prisma } from '@/lib/server/prisma';
+import { Admin, User, connectToDatabase } from '@/lib/server/mongodb';
 
 function toAuthUser(input: {
   id: string;
   name: string;
   email: string;
-  role: UserRole;
+  role: 'ADMIN' | 'STUDENT';
   admin?: { adminId: string } | null;
 }): AuthUser {
-  const isAdmin = input.role === UserRole.ADMIN;
+  const isAdmin = input.role === 'ADMIN';
 
   return {
     id: input.id,
@@ -21,32 +20,19 @@ function toAuthUser(input: {
   };
 }
 
-export async function authenticateUser(identifier: string, password: string): Promise<AuthUser | null> {
+export async function authenticateUser(
+  identifier: string,
+  password: string
+): Promise<{ user: AuthUser; emailVerified: boolean } | null> {
   const normalizedInput = identifier.trim();
+  await connectToDatabase();
 
-  const userByEmail = await prisma.user.findUnique({
-    where: { email: normalizedInput.toLowerCase() },
-    include: {
-      student: true,
-      admin: true,
-    },
-  });
+  const userByEmail = await User.findOne({ email: normalizedInput.toLowerCase() }).lean();
 
-  const adminById = !userByEmail
-    ? await prisma.admin.findUnique({
-        where: { adminId: normalizedInput.toUpperCase() },
-        include: {
-          user: {
-            include: {
-              student: true,
-              admin: true,
-            },
-          },
-        },
-      })
-    : null;
+  const adminById = !userByEmail ? await Admin.findOne({ adminId: normalizedInput.toUpperCase() }).lean() : null;
+  const adminUser = adminById ? await User.findById(adminById.userId).lean() : null;
 
-  const linkedUser = userByEmail || adminById?.user;
+  const linkedUser = userByEmail || adminUser;
   if (!linkedUser) {
     return null;
   }
@@ -56,5 +42,15 @@ export async function authenticateUser(identifier: string, password: string): Pr
     return null;
   }
 
-  return toAuthUser(linkedUser);
+  const admin = linkedUser.role === 'ADMIN' ? await Admin.findOne({ userId: linkedUser._id }).lean() : null;
+  return {
+    user: toAuthUser({
+      id: linkedUser._id.toString(),
+      name: linkedUser.name,
+      email: linkedUser.email,
+      role: linkedUser.role,
+      admin: admin ? { adminId: admin.adminId } : null,
+    }),
+    emailVerified: Boolean(linkedUser.emailVerifiedAt),
+  };
 }

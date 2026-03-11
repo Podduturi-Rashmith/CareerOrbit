@@ -10,7 +10,8 @@ import {
   User, 
   Settings, 
   LogOut,
-  ShieldCheck
+  ShieldCheck,
+  UserPlus
 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { cn } from '@/lib/utils';
@@ -18,6 +19,23 @@ import { cn } from '@/lib/utils';
 const Sidebar = () => {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const [newUserCount, setNewUserCount] = React.useState(0);
+
+  React.useEffect(() => {
+    const loadNewUserCount = async () => {
+      if (user?.role !== 'admin') return;
+      try {
+        const response = await fetch('/api/admin/new-users?countOnly=1', { credentials: 'include' });
+        if (!response.ok) return;
+        const data = await response.json();
+        setNewUserCount(data.count || 0);
+      } catch {
+        setNewUserCount(0);
+      }
+    };
+
+    loadNewUserCount().catch(() => undefined);
+  }, [user]);
 
   const studentLinks = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -27,6 +45,7 @@ const Sidebar = () => {
   ];
 
   const adminLinks = [
+    { name: 'New Users', href: '/admin/new-users', icon: UserPlus, badge: newUserCount },
     { name: 'Admin Panel', href: '/admin', icon: ShieldCheck },
   ];
 
@@ -58,7 +77,12 @@ const Sidebar = () => {
               )}
             >
               <link.icon className={cn("w-5 h-5", isActive ? "text-indigo-600" : "text-slate-400")} />
-              {link.name}
+              <span className="flex-1">{link.name}</span>
+              {link.badge && link.badge > 0 && (
+                <span className="inline-flex items-center justify-center rounded-full bg-rose-600 text-white text-[10px] font-bold min-w-[18px] h-[18px] px-1.5">
+                  {link.badge}
+                </span>
+              )}
             </Link>
           );
         })}

@@ -2,9 +2,11 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'motion/react';
 import { ArrowUpRight, BriefcaseBusiness, CalendarClock, CircleDotDashed, ExternalLink, Trophy } from 'lucide-react';
 import DashboardLayout from '@/components/DashboardLayout';
+import StudentOnboardingForm from '@/components/StudentOnboardingForm';
 import { useAuth } from '@/hooks/use-auth';
 import type { StudentApplicationDto } from '@/lib/applications/serialize';
 
@@ -31,8 +33,11 @@ export default function DashboardPage() {
 
 function DashboardContent() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const [applications, setApplications] = React.useState<StudentApplicationDto[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const isFirstWelcome = searchParams.get('welcome') === '1';
+  const [onboardingStatus, setOnboardingStatus] = React.useState<'loading' | 'required' | 'complete'>('loading');
 
   React.useEffect(() => {
     const loadApplications = async () => {
@@ -54,6 +59,44 @@ function DashboardContent() {
     });
   }, []);
 
+  React.useEffect(() => {
+    if (user?.role === 'admin') {
+      window.location.href = '/admin';
+    }
+  }, [user]);
+
+  React.useEffect(() => {
+    if (user?.role === 'admin') {
+      return;
+    }
+    const loadOnboarding = async () => {
+      try {
+        const response = await fetch('/api/student/onboarding', { credentials: 'include' });
+        if (!response.ok) throw new Error('Failed to load onboarding');
+        const data = await response.json();
+        setOnboardingStatus(data.completed ? 'complete' : 'required');
+      } catch {
+        setOnboardingStatus('required');
+      }
+    };
+
+    loadOnboarding().catch(() => {
+      setOnboardingStatus('required');
+    });
+  }, [user]);
+
+  if (onboardingStatus === 'loading') {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-12 text-slate-600">
+        Loading your registration form...
+      </div>
+    );
+  }
+
+  if (onboardingStatus === 'required') {
+    return <StudentOnboardingForm onComplete={() => setOnboardingStatus('complete')} />;
+  }
+
   const stats = [
     { label: 'Total Applications', value: applications.length, icon: BriefcaseBusiness, tone: 'from-sky-600 to-sky-500' },
     { label: 'Screening + Interviews', value: applications.filter((a) => a.status === 'Screening Call' || a.status === 'Interview').length, icon: CalendarClock, tone: 'from-teal-700 to-teal-600' },
@@ -71,7 +114,10 @@ function DashboardContent() {
         <div className="relative flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-slate-300 font-semibold">Student Workspace</p>
-            <h1 className="mt-3 text-3xl md:text-4xl font-display font-black tracking-tight">Welcome back, {user?.name || 'Student'}</h1>
+            <h1 className="mt-3 text-3xl md:text-4xl font-display font-black tracking-tight">
+              {isFirstWelcome ? 'Welcome to CareerOrbit' : 'Welcome back'}
+              {`, ${user?.name || 'Student'}`}
+            </h1>
             <p className="mt-3 text-slate-300 max-w-2xl">
               Stay consistent. Keep interviews prepared, follow up on screenings, and move each application to the next stage.
             </p>

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
-import { Prisma, UserRole } from '@prisma/client';
-import { prisma } from '@/lib/server/prisma';
-import { createSession, getSessionCookieMaxAgeSeconds, getSessionCookieName } from '@/lib/auth/session';
+import { Student, User, connectToDatabase } from '@/lib/server/mongodb';
+import { createEmailVerificationToken } from '@/lib/auth/verification';
+import { sendVerificationEmail } from '@/lib/auth/mailer';
 
 export const runtime = 'nodejs';
 
@@ -20,6 +20,7 @@ const registerSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    await connectToDatabase();
     const body = await request.json();
     const parsed = registerSchema.safeParse(body);
 
@@ -33,54 +34,43 @@ export async function POST(request: Request) {
     const { name, email, password, major, graduationYear } = parsed.data;
     const passwordHash = await bcrypt.hash(password, 12);
 
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        role: UserRole.STUDENT,
-        passwordHash,
-        student: {
-          create: {
-            major: major || 'Undeclared',
-            graduationYear: graduationYear || new Date().getFullYear() + 4,
-          },
-        },
-      },
-      include: {
-        student: true,
-      },
+    const existing = await User.findOne({ email }).lean();
+    if (existing) {
+      return NextResponse.json({ error: 'Email already exists. Try signing in instead.' }, { status: 409 });
+    }
+
+    const user = await User.create({
+      name,
+      email,
+      role: 'STUDENT',
+      passwordHash,
     });
 
-    const { token } = await createSession(user.id);
+    await Student.create({
+      userId: user._id,
+      major: major || 'Undeclared',
+      graduationYear: graduationYear || new Date().getFullYear() + 4,
+    });
+
+    const { token } = await createEmailVerificationToken(user._id.toString());
+    const origin = new URL(request.url).origin;
+    const verifyLink = `${origin}/api/auth/verify-email?token=${token}`;
+    await sendVerificationEmail(user.email, verifyLink);
+
     const response = NextResponse.json({
       user: {
-        id: user.id,
+        id: user._id.toString(),
         name: user.name,
         email: user.email,
         role: 'student',
         identifier: user.email,
       },
-    });
-
-    response.cookies.set({
-      name: getSessionCookieName(),
-      value: token,
-      maxAge: getSessionCookieMaxAgeSeconds(),
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
+      requiresVerification: true,
+      verificationLink: process.env.NODE_ENV !== 'production' ? verifyLink : undefined,
     });
 
     return response;
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return NextResponse.json(
-        { error: 'Email already exists. Try signing in instead.' },
-        { status: 409 }
-      );
-    }
-
+  } catch {
     return NextResponse.json({ error: 'Unable to create account right now.' }, { status: 500 });
   }
 }

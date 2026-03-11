@@ -1,4 +1,4 @@
-import type { Application, ApplicationStatus, UpcomingEventType } from '@prisma/client';
+import type { ApplicationDoc } from '@/lib/server/mongodb';
 
 export type ApplicationUiStatus = 'Applied' | 'Screening Call' | 'Interview' | 'Assessment' | 'Rejected' | 'Offer';
 export type CalendarEventType = 'Screening' | 'Interview' | 'Assessment';
@@ -19,7 +19,10 @@ export interface StudentApplicationDto {
   };
 }
 
-const STATUS_LABELS: Record<ApplicationStatus, ApplicationUiStatus> = {
+type DbApplicationStatus = 'APPLIED' | 'SCREENING_CALL' | 'INTERVIEW' | 'ASSESSMENT' | 'REJECTED' | 'OFFER';
+type DbUpcomingEventType = 'SCREENING' | 'INTERVIEW' | 'ASSESSMENT';
+
+const STATUS_LABELS: Record<DbApplicationStatus, ApplicationUiStatus> = {
   APPLIED: 'Applied',
   SCREENING_CALL: 'Screening Call',
   INTERVIEW: 'Interview',
@@ -28,13 +31,13 @@ const STATUS_LABELS: Record<ApplicationStatus, ApplicationUiStatus> = {
   OFFER: 'Offer',
 };
 
-const EVENT_TYPE_LABELS: Record<UpcomingEventType, CalendarEventType> = {
+const EVENT_TYPE_LABELS: Record<DbUpcomingEventType, CalendarEventType> = {
   SCREENING: 'Screening',
   INTERVIEW: 'Interview',
   ASSESSMENT: 'Assessment',
 };
 
-export function toStudentApplicationDto(app: Application): StudentApplicationDto {
+export function toStudentApplicationDto(app: ApplicationDoc): StudentApplicationDto {
   const upcomingEvent =
     app.upcomingEventType && app.upcomingEventDate
       ? {
@@ -46,13 +49,13 @@ export function toStudentApplicationDto(app: Application): StudentApplicationDto
       : undefined;
 
   return {
-    id: app.id,
+    id: app._id.toString(),
     companyName: app.companyName,
     jobRole: app.jobRole,
     status: STATUS_LABELS[app.status],
-    resumeUrl: app.resumeUrl,
+    resumeUrl: app.resumeUrl ?? null,
     applicationDate: app.applicationDate.toISOString().slice(0, 10),
-    notes: app.notes,
+    notes: app.notes ?? null,
     upcomingEvent,
   };
 }

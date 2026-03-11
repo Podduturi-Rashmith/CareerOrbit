@@ -2,18 +2,18 @@
 
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
-import { ArrowRight, Building2, CheckCircle2, ShieldCheck, UserPlus } from 'lucide-react';
+import { ArrowRight, Building2, CheckCircle2, Chrome, ShieldCheck, UserPlus } from 'lucide-react';
 import { MOCK_PLACEMENTS } from '@/lib/mock-data';
 
 export default function LandingPage() {
-  const router = useRouter();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [verificationLink, setVerificationLink] = useState('');
 
   const highlights = useMemo(
     () => [
@@ -27,6 +27,8 @@ export default function LandingPage() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
+    setVerificationLink('');
     setIsSubmitting(true);
 
     try {
@@ -42,7 +44,11 @@ export default function LandingPage() {
         throw new Error(body.error || 'Failed to create account.');
       }
 
-      router.push('/dashboard');
+      const body = await response.json();
+      setSuccess('Account created. Please verify your email before signing in.');
+      if (body.verificationLink) {
+        setVerificationLink(body.verificationLink);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create account.');
     } finally {
@@ -128,8 +134,32 @@ export default function LandingPage() {
                 </div>
               </div>
 
+              <a
+                href="/api/auth/google"
+                className="w-full flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                <Chrome className="w-4 h-4 text-slate-600" />
+                Continue with Google
+              </a>
+              <div className="my-4 flex items-center gap-3 text-xs text-slate-400">
+                <span className="flex-1 h-px bg-slate-200" />
+                or create with email
+                <span className="flex-1 h-px bg-slate-200" />
+              </div>
+
               <form onSubmit={handleSignup} className="space-y-4">
                 {error && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+                {success && (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 text-emerald-600" />
+                    <span>{success}</span>
+                  </div>
+                )}
+                {verificationLink && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 break-all">
+                    Dev verification link: {verificationLink}
+                  </div>
+                )}
 
                 <div>
                   <label className="text-sm font-semibold text-slate-700">Full Name</label>

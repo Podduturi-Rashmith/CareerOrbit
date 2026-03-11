@@ -59,12 +59,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (!response.ok) {
-      throw new Error('Invalid credentials');
+      const body = await response.json().catch(() => ({ error: 'Invalid credentials' }));
+      throw new Error(body.error || 'Invalid credentials');
     }
 
     const data = await response.json();
     setUser(data.user);
-    router.push('/dashboard');
+    router.push(data.user.role === 'admin' ? '/admin' : '/dashboard');
   };
 
   const logout = async () => {

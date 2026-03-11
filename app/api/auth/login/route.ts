@@ -20,15 +20,19 @@ export async function POST(request: Request) {
     }
 
     const { identifier, password } = parsed.data;
-    const user = await authenticateUser(identifier, password);
+    const result = await authenticateUser(identifier, password);
 
-    if (!user) {
+    if (!result) {
       return NextResponse.json({ error: 'Invalid credentials.' }, { status: 401 });
     }
 
-    const { token } = await createSession(user.id);
+    if (result.user.role === 'student' && !result.emailVerified) {
+      return NextResponse.json({ error: 'Email not verified. Check your inbox.' }, { status: 403 });
+    }
 
-    const response = NextResponse.json({ user });
+    const { token } = await createSession(result.user.id);
+
+    const response = NextResponse.json({ user: result.user });
     response.cookies.set({
       name: getSessionCookieName(),
       value: token,

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { prisma } from '@/lib/server/prisma';
+import { JobListing, TailoredResume, connectToDatabase } from '@/lib/server/mongodb';
 import { requireAdminUser } from '@/lib/auth/require-admin';
 import { buildTailoredResumeSummary } from '@/lib/jobs/student-match';
 import type { JobRoleCategory } from '@/lib/jobs/types';
@@ -14,6 +14,7 @@ const tailorSchema = z.object({
 });
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
+  await connectToDatabase();
   const auth = await requireAdminUser();
   if (auth.error) return auth.error;
 
@@ -24,7 +25,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
 
   const { id } = await context.params;
-  const job = await prisma.jobListing.findUnique({ where: { id } });
+  const job = await JobListing.findById(id).lean();
 
   if (!job) {
     return NextResponse.json({ error: 'Job not found.' }, { status: 404 });
@@ -39,16 +40,22 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     baseResume: MOCK_STUDENTS.find((student) => student.email.toLowerCase() === parsed.data.studentEmail.toLowerCase())?.baseResume,
   });
 
-  const draft = await prisma.tailoredResume.create({
-    data: {
-      jobId: job.id,
-      studentEmail: parsed.data.studentEmail,
-      studentName: parsed.data.studentName,
-      roleCategory: job.roleCategory,
-      summary,
-      generatedById: auth.user.id,
-    },
+  const draft = await TailoredResume.create({
+    jobId: job._id,
+    studentEmail: parsed.data.studentEmail,
+    studentName: parsed.data.studentName,
+    roleCategory: job.roleCategory,
+    summary,
+    generatedById: auth.user.id,
   });
 
-  return NextResponse.json({ draft, job });
+  return NextResponse.json({
+    draft: {
+      ...draft.toObject(),
+      id: draft._id.toString(),
+      jobId: draft.jobId.toString(),
+      generatedById: draft.generatedById ? draft.generatedById.toString() : null,
+    },
+    job: { ...job, id: job._id.toString() },
+  });
 }

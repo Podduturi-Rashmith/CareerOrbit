@@ -24,6 +24,16 @@ import { roleLabel } from '@/lib/jobs/role-utils';
 import type { Student } from '@/lib/mock-data';
 
 type ActiveTab = 'students' | 'applications' | 'bot-lab';
+type DashboardRoleFilter =
+  | 'all'
+  | 'software-engineer'
+  | 'data-analyst'
+  | 'machine-learning'
+  | 'fullstack-developer'
+  | 'python-developer'
+  | 'java-developer'
+  | 'aiml'
+  | 'other';
 
 type AdminJob = {
   id: string;
@@ -45,6 +55,11 @@ type TailoredDraft = {
   roleCategory: string;
   summary: string;
   createdAt: string;
+};
+
+type RefreshRoleStat = {
+  role: string;
+  count: number;
 };
 
 const statusTone: Record<string, string> = {
@@ -73,7 +88,7 @@ export default function AdminDashboard() {
   const [jobs, setJobs] = useState<AdminJob[]>([]);
   const [jobsLoading, setJobsLoading] = useState(false);
   const [jobsError, setJobsError] = useState('');
-  const [roleFilter, setRoleFilter] = useState('all');
+  const [roleFilter, setRoleFilter] = useState<DashboardRoleFilter>('all');
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<StudentCandidate[]>([]);
   const [candidateLoading, setCandidateLoading] = useState(false);
@@ -81,7 +96,13 @@ export default function AdminDashboard() {
   const [selectedCandidateName, setSelectedCandidateName] = useState('');
   const [tailoring, setTailoring] = useState(false);
   const [tailoredDraft, setTailoredDraft] = useState<TailoredDraft | null>(null);
-  const [refreshMeta, setRefreshMeta] = useState<{ fetchedCount: number; newCount: number } | null>(null);
+  const [refreshMeta, setRefreshMeta] = useState<{
+    fetchedCount: number;
+    newCount: number;
+    provider?: string;
+    targetPerRole?: number;
+    roleStats?: RefreshRoleStat[];
+  } | null>(null);
 
   const interviewCount = MOCK_APPLICATIONS.filter((a) => a.status === 'Interview').length;
   const offerCount = MOCK_APPLICATIONS.filter((a) => a.status === 'Offer').length;
@@ -110,6 +131,30 @@ export default function AdminDashboard() {
   ];
 
   const selectedJob = jobs.find((job) => job.id === selectedJobId) || null;
+
+  const filteredJobs = useMemo(() => {
+    if (roleFilter === 'all') return jobs;
+    const queryByRole: Record<Exclude<DashboardRoleFilter, 'all'>, string[]> = {
+      'software-engineer': ['software engineer', 'sde', 'backend engineer', 'frontend engineer'],
+      'data-analyst': ['data analyst', 'analytics'],
+      'machine-learning': ['machine learning', 'ml engineer', 'deep learning'],
+      'fullstack-developer': ['fullstack', 'full stack'],
+      'python-developer': ['python developer', 'python engineer'],
+      'java-developer': ['java developer', 'spring boot'],
+      aiml: ['ai', 'ml', 'machine learning'],
+      other: [],
+    };
+
+    const current = queryByRole[roleFilter];
+    return jobs.filter((job) => {
+      if (roleFilter === 'other') return job.roleCategory === 'other';
+      if (job.roleCategory === roleFilter) return true;
+      const haystack = `${job.title} ${job.description}`.toLowerCase();
+      return current.some((keyword) => haystack.includes(keyword));
+    });
+  }, [jobs, roleFilter]);
+
+  const selectedVisibleJob = filteredJobs.find((job) => job.id === selectedJobId) || selectedJob;
 
   const openEditStudent = (student: Student) => {
     setEditingStudentId(student.id);
@@ -146,7 +191,8 @@ export default function AdminDashboard() {
     setJobsError('');
     try {
       const query = new URLSearchParams();
-      if (currentRole && currentRole !== 'all') query.set('role', currentRole);
+      const serverRoleFilters = new Set(['software-engineer', 'data-analyst', 'java-developer', 'aiml', 'other']);
+      if (currentRole && currentRole !== 'all' && serverRoleFilters.has(currentRole)) query.set('role', currentRole);
       const response = await fetch(`/api/admin/jobs?${query.toString()}`, { credentials: 'include' });
       if (!response.ok) throw new Error('Failed to fetch jobs');
       const data = await response.json();
@@ -173,9 +219,9 @@ export default function AdminDashboard() {
       const data = await response.json();
       setJobs(data.jobs || []);
       setRefreshMeta(data.meta || null);
-      if (data.jobs?.length) {
-        setSelectedJobId(data.jobs[0].id);
-      }
+	      if (data.jobs?.length) {
+	        setSelectedJobId(data.jobs[0].id);
+	      }
     } catch (error) {
       setJobsError(error instanceof Error ? error.message : 'Bot refresh failed');
     } finally {
@@ -360,12 +406,6 @@ export default function AdminDashboard() {
                     </div>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => setShowAddStudent(true)}
-                        className="px-3 py-2 rounded-lg bg-teal-700 text-white text-sm font-semibold hover:bg-teal-800 inline-flex items-center gap-1.5 whitespace-nowrap"
-                      >
-                        <Plus className="w-4 h-4" /> Student
-                      </button>
-                      <button
                         onClick={() => setShowAddApplication(true)}
                         className="px-3 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-black inline-flex items-center gap-1.5 whitespace-nowrap"
                       >
@@ -474,37 +514,56 @@ export default function AdminDashboard() {
                         </button>
                       </div>
                       <div className="mt-3 flex items-center gap-2">
-                        <select
-                          value={roleFilter}
-                          onChange={(e) => {
-                            const next = e.target.value;
-                            setRoleFilter(next);
-                            loadJobs(next).catch(() => undefined);
-                          }}
+	                        <select
+	                          value={roleFilter}
+	                          onChange={(e) => {
+	                            const next = e.target.value as DashboardRoleFilter;
+	                            setRoleFilter(next);
+	                            loadJobs(next).catch(() => undefined);
+	                          }}
                           className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm"
                         >
-                          <option value="all">All Roles</option>
-                          <option value="software-engineer">Software Engineer</option>
-                          <option value="data-analyst">Data Analyst</option>
-                          <option value="java-developer">Java Developer</option>
-                          <option value="aiml">AI/ML</option>
-                          <option value="other">Other</option>
-                        </select>
+	                          <option value="all">All Roles</option>
+	                          <option value="software-engineer">Software Engineer</option>
+	                          <option value="data-analyst">Data Analyst</option>
+	                          <option value="machine-learning">Machine Learning</option>
+	                          <option value="fullstack-developer">Fullstack Developer</option>
+	                          <option value="python-developer">Python Developer</option>
+	                          <option value="java-developer">Java Developer</option>
+	                          <option value="aiml">AI/ML</option>
+	                          <option value="other">Other</option>
+	                        </select>
                         <button onClick={() => loadJobs().catch(() => undefined)} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-100">
                           Refresh View
                         </button>
                       </div>
-                      {refreshMeta && <p className="mt-2 text-xs text-emerald-700">Last run fetched {refreshMeta.fetchedCount} jobs, with {refreshMeta.newCount} new.</p>}
-                      {jobsError && <p className="mt-2 text-xs text-rose-600">{jobsError}</p>}
-                    </div>
+	                      {refreshMeta && (
+	                        <div className="mt-2 space-y-1">
+	                          <p className="text-xs text-emerald-700">
+	                            Last run fetched {refreshMeta.fetchedCount} jobs, with {refreshMeta.newCount} new.
+	                          </p>
+	                          {refreshMeta.roleStats && refreshMeta.targetPerRole && (
+	                            <p className="text-xs text-amber-700">
+	                              {refreshMeta.roleStats.some((stat) => stat.count < refreshMeta.targetPerRole!)
+	                                ? `Low volume today: ${refreshMeta.roleStats
+	                                    .filter((stat) => stat.count < refreshMeta.targetPerRole!)
+	                                    .map((stat) => `${stat.role} (${stat.count}/${refreshMeta.targetPerRole})`)
+	                                    .join(', ')}. This is normal when fewer fresh full-time jobs are posted.`
+	                                : `Target met: ${refreshMeta.targetPerRole} per role.`}
+	                            </p>
+	                          )}
+	                        </div>
+	                      )}
+	                      {jobsError && <p className="mt-2 text-xs text-rose-600">{jobsError}</p>}
+	                    </div>
 
                     <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
                       <div className="px-4 py-3 border-b border-slate-200">
                         <p className="text-sm font-bold text-slate-900">Fetched Jobs</p>
                       </div>
                       <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-200">
-                        {jobs.map((job) => (
-                          <button
+	                        {filteredJobs.map((job) => (
+	                          <button
                             key={job.id}
                             onClick={() => setSelectedJobId(job.id)}
                             className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors ${selectedJobId === job.id ? 'bg-slate-50' : ''}`}
@@ -518,23 +577,23 @@ export default function AdminDashboard() {
                             </div>
                           </button>
                         ))}
-                        {!jobsLoading && jobs.length === 0 && <p className="px-4 py-6 text-sm text-slate-500">No jobs yet. Click “Run Bot Now”.</p>}
-                      </div>
-                    </div>
-                  </div>
+	                        {!jobsLoading && filteredJobs.length === 0 && <p className="px-4 py-6 text-sm text-slate-500">No jobs found for this role yet. Click “Run Bot Now”.</p>}
+	                      </div>
+	                    </div>
+	                  </div>
 
                   <div className="space-y-4">
                     <div className="rounded-2xl border border-slate-200 bg-white p-4">
                       <p className="text-sm font-bold text-slate-900">Selected Job</p>
-                      {selectedJob ? (
-                        <div className="mt-2 space-y-2">
-                          <p className="font-semibold text-slate-900">{selectedJob.title}</p>
-                          <p className="text-sm text-slate-600">{selectedJob.company} • {selectedJob.location || 'Location not listed'}</p>
-                          <p className="text-xs text-slate-500">{selectedJob.description}</p>
-                          <a href={selectedJob.applyUrl} target="_blank" rel="noreferrer" className="inline-flex mt-2 rounded-lg bg-slate-900 text-white px-3 py-2 text-sm font-semibold hover:bg-black">
-                            Open Company Apply Link
-                          </a>
-                        </div>
+	                      {selectedVisibleJob ? (
+	                        <div className="mt-2 space-y-2">
+	                          <p className="font-semibold text-slate-900">{selectedVisibleJob.title}</p>
+	                          <p className="text-sm text-slate-600">{selectedVisibleJob.company} • {selectedVisibleJob.location || 'Location not listed'}</p>
+	                          <p className="text-xs text-slate-500">{selectedVisibleJob.description}</p>
+	                          <a href={selectedVisibleJob.applyUrl} target="_blank" rel="noreferrer" className="inline-flex mt-2 rounded-lg bg-slate-900 text-white px-3 py-2 text-sm font-semibold hover:bg-black">
+	                            Open Company Apply Link
+	                          </a>
+	                        </div>
                       ) : (
                         <p className="mt-2 text-sm text-slate-500">Pick a job from the left panel.</p>
                       )}

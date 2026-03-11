@@ -100,6 +100,17 @@ export default function CalendarPage() {
     });
   }, [dateRangeFilter, events, studentFilter, typeFilter, viewerRole]);
 
+  const eventsByDate = React.useMemo(() => {
+    const map = new Map<string, CalendarEvent[]>();
+    for (const event of filteredEvents) {
+      const dateKey = format(new Date(event.date), 'yyyy-MM-dd');
+      const list = map.get(dateKey) || [];
+      list.push(event);
+      map.set(dateKey, list);
+    }
+    return map;
+  }, [filteredEvents]);
+
   const renderHeader = () => {
     return (
       <div className="flex items-center justify-between mb-8">
@@ -228,7 +239,8 @@ export default function CalendarPage() {
     return (
       <div className="grid grid-cols-7 gap-px bg-slate-200 border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
         {calendarDays.map((day, i) => {
-          const dayEvents = filteredEvents.filter((event) => isSameDay(new Date(event.date), day));
+          const dateKey = format(day, 'yyyy-MM-dd');
+          const dayEvents = eventsByDate.get(dateKey) || [];
           const isSelected = isSameDay(day, selectedDate);
           const isCurrentMonth = isSameMonth(day, monthStart);
 

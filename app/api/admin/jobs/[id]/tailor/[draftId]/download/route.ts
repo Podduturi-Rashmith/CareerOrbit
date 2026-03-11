@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/server/prisma';
+import { JobListing, TailoredResume, connectToDatabase } from '@/lib/server/mongodb';
 import { requireAdminUser } from '@/lib/auth/require-admin';
 import type { JobRoleCategory } from '@/lib/jobs/types';
 import { generateResumeDocxBuffer, makeResumeFilename } from '@/lib/jobs/resume-docx';
@@ -8,20 +8,19 @@ import { MOCK_STUDENTS } from '@/lib/mock-data';
 export const runtime = 'nodejs';
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string; draftId: string }> }) {
+  await connectToDatabase();
   const auth = await requireAdminUser();
   if (auth.error) return auth.error;
 
   const { id, draftId } = await context.params;
 
-  const draft = await prisma.tailoredResume.findUnique({
-    where: { id: draftId },
-  });
+  const draft = await TailoredResume.findById(draftId).lean();
 
-  if (!draft || draft.jobId !== id) {
+  if (!draft || draft.jobId.toString() !== id) {
     return NextResponse.json({ error: 'Resume draft not found.' }, { status: 404 });
   }
 
-  const job = await prisma.jobListing.findUnique({ where: { id } });
+  const job = await JobListing.findById(id).lean();
   if (!job) {
     return NextResponse.json({ error: 'Job not found.' }, { status: 404 });
   }

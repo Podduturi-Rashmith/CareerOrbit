@@ -1,102 +1,90 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/server/prisma';
+import { JobFetchRun, JobListing, connectToDatabase } from '@/lib/server/mongodb';
 import { requireAdminUser } from '@/lib/auth/require-admin';
 import { fetchMockJobsSnapshot } from '@/lib/jobs/mock-provider';
+import { fetchRapidApiJobsSnapshot } from '@/lib/jobs/rapidapi-provider';
 
 export const runtime = 'nodejs';
 
 export async function POST() {
+  await connectToDatabase();
   const auth = await requireAdminUser();
   if (auth.error) return auth.error;
 
-  const run = await prisma.jobFetchRun.create({
-    data: {
-      provider: 'mock-job-scout',
-      status: 'running',
-      fetchedCount: 0,
-      newCount: 0,
-    },
+  const run = await JobFetchRun.create({
+    provider: process.env.RAPIDAPI_KEY && process.env.RAPIDAPI_HOST ? 'rapidapi-glassdoor' : 'mock-job-scout',
+    status: 'running',
+    fetchedCount: 0,
+    newCount: 0,
+    startedAt: new Date(),
   });
 
   try {
-    const incoming = await fetchMockJobsSnapshot();
+    const rapid = await fetchRapidApiJobsSnapshot();
+    const incoming = rapid.enabled ? rapid.jobs : await fetchMockJobsSnapshot();
     let newCount = 0;
 
     for (const item of incoming) {
-      const existing = await prisma.jobListing.findUnique({
-        where: {
-          source_externalId: {
-            source: item.source,
-            externalId: item.externalId,
-          },
-        },
-      });
+      const existing = await JobListing.findOne({ source: item.source, externalId: item.externalId }).lean();
 
       if (!existing) {
         newCount += 1;
       }
 
-      await prisma.jobListing.upsert({
-        where: {
-          source_externalId: {
+      await JobListing.updateOne(
+        { source: item.source, externalId: item.externalId },
+        {
+          $set: {
+            title: item.title,
+            company: item.company,
+            location: item.location,
+            roleCategory: item.roleCategory,
+            workMode: item.workMode,
+            description: item.description,
+            applyUrl: item.applyUrl,
+            postedAt: item.postedAt,
+            fetchedAt: new Date(),
+            isFresh: !existing,
+          },
+          $setOnInsert: {
             source: item.source,
             externalId: item.externalId,
+            createdAt: new Date(),
           },
         },
-        update: {
-          title: item.title,
-          company: item.company,
-          location: item.location,
-          roleCategory: item.roleCategory,
-          workMode: item.workMode,
-          description: item.description,
-          applyUrl: item.applyUrl,
-          postedAt: item.postedAt,
-          fetchedAt: new Date(),
-          isNew: !existing,
-        },
-        create: {
-          source: item.source,
-          externalId: item.externalId,
-          title: item.title,
-          company: item.company,
-          location: item.location,
-          roleCategory: item.roleCategory,
-          workMode: item.workMode,
-          description: item.description,
-          applyUrl: item.applyUrl,
-          postedAt: item.postedAt,
-          fetchedAt: new Date(),
-          isNew: true,
-        },
-      });
+        { upsert: true }
+      );
     }
 
-    await prisma.jobFetchRun.update({
-      where: { id: run.id },
-      data: {
-        status: 'completed',
+    await JobFetchRun.updateOne(
+      { _id: run._id },
+      { $set: { status: 'completed', fetchedCount: incoming.length, newCount, finishedAt: new Date() } }
+    );
+
+    const jobs = await JobListing.find({}).sort({ postedAt: -1, createdAt: -1 }).limit(50).lean();
+
+    return NextResponse.json({
+      jobs: jobs.map((job) => {
+        const { _id, isFresh, ...rest } = job as { _id: { toString(): string }; isFresh?: boolean } & Record<string, unknown>;
+        return {
+          ...rest,
+          id: _id.toString(),
+          isNew: Boolean(isFresh),
+        };
+      }),
+      meta: {
         fetchedCount: incoming.length,
         newCount,
-        finishedAt: new Date(),
+        provider: rapid.enabled ? 'rapidapi-glassdoor' : 'mock-job-scout',
+        roleStats: rapid.enabled ? rapid.roleStats : undefined,
+        targetPerRole: rapid.enabled ? rapid.targetPerRole : undefined,
       },
     });
-
-    const jobs = await prisma.jobListing.findMany({
-      orderBy: [{ postedAt: 'desc' }, { createdAt: 'desc' }],
-      take: 50,
-    });
-
-    return NextResponse.json({ jobs, meta: { fetchedCount: incoming.length, newCount } });
   } catch (error) {
-    await prisma.jobFetchRun.update({
-      where: { id: run.id },
-      data: {
-        status: 'failed',
-        finishedAt: new Date(),
-        error: error instanceof Error ? error.message : 'Unknown error',
-      },
-    });
+    await JobFetchRun.updateOne(
+      { _id: run._id },
+      { $set: { status: 'failed', finishedAt: new Date(), error: error instanceof Error ? error.message : 'Unknown error' } }
+    );
 
     return NextResponse.json({ error: 'Failed to refresh jobs.' }, { status: 500 });
   }
