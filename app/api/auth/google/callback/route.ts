@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
   const state = searchParams.get('state');
-  const cookieState = cookies().get('google_oauth_state')?.value;
+  const cookieState = (await cookies()).get('google_oauth_state')?.value;
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
