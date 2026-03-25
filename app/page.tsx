@@ -1,7 +1,7 @@
 'use client';
 
 import React, {
-  useState, useEffect, useCallback, useRef, useMemo,
+  useState, useEffect, useCallback, useRef,
 } from 'react';
 import Link from 'next/link';
 import {
@@ -200,15 +200,17 @@ function TiltCard({ children, className = '' }: { children: React.ReactNode; cla
 /* ════════════════════════════════════════════
    PARTICLES
 ════════════════════════════════════════════ */
+const PARTICLE_DOTS = Array.from({ length: 18 }, (_, i) => ({
+  id: i,
+  x: Math.random() * 100,
+  y: Math.random() * 100,
+  r: Math.random() * 2 + 1,
+  dur: Math.random() * 8 + 6,
+  delay: Math.random() * 5,
+}));
+
 function Particles() {
-  const dots = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    r: Math.random() * 2 + 1,
-    dur: Math.random() * 8 + 6,
-    delay: Math.random() * 5,
-  })), []);
+  const dots = PARTICLE_DOTS;
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
       {dots.map(d => (
