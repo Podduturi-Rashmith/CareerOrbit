@@ -1,272 +1,1053 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, {
+  useState, useEffect, useCallback, useRef, useMemo,
+} from 'react';
 import Link from 'next/link';
-import { motion } from 'motion/react';
-import { ArrowRight, Building2, CheckCircle2, Chrome, ShieldCheck, UserPlus } from 'lucide-react';
+import {
+  motion, AnimatePresence,
+  useMotionValue, useSpring, useScroll, useTransform, useInView,
+} from 'motion/react';
+import {
+  ArrowRight, CheckCircle, ShieldCheck, UserPlus, FileText,
+  CursorClick, MagnifyingGlass, ChartBar, CalendarDots,
+  BookOpen, Bell, Sparkle, CaretDown, Lightning,
+  TrendUp, Clock, Briefcase, Users, SealCheck,
+} from '@phosphor-icons/react';
 import { MOCK_PLACEMENTS } from '@/lib/mock-data';
 
-export default function LandingPage() {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [verificationLink, setVerificationLink] = useState('');
+/* ════════════════════════════════════════════
+   CONSTANTS
+════════════════════════════════════════════ */
+const EASE = [0.22, 1, 0.36, 1] as const;
 
-  const highlights = useMemo(
-    () => [
-      { label: 'Students Supported', value: '1,200+' },
-      { label: 'Partner Recruiters', value: '180' },
-      { label: 'Interview-to-Offer', value: '41%' },
-    ],
-    []
-  );
+const COMPANIES = [
+  { name: 'Stripe',  role: 'Software Engineer',  fields: 22, color: '#635bff' },
+  { name: 'Figma',   role: 'Frontend Developer', fields: 18, color: '#a259ff' },
+  { name: 'Notion',  role: 'Full-Stack Engineer', fields: 24, color: '#e8e8e8' },
+  { name: 'Vercel',  role: 'Backend Engineer',   fields: 20, color: '#e8e8e8' },
+  { name: 'Airbnb',  role: 'Product Engineer',   fields: 26, color: '#ff5a5f' },
+];
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
-    setVerificationLink('');
-    setIsSubmitting(true);
+const FAQ_DATA = [
+  { q: 'How is CareerOrbit different from a job board?', a: "Job boards show you listings — you still apply yourself. We source roles, tailor your resume for each one, fill every field, and hand you a ready-to-submit package." },
+  { q: 'Is this completely legal?', a: "Yes. We prepare ~90% of the work. You review and submit yourself — you stay the applicant at all times. No account impersonation, no compliance risk." },
+  { q: 'I already have a job. Is CareerOrbit useful?', a: "Absolutely. Many users are currently employed and passively exploring better opportunities without spending hours searching. Your subscription keeps your profile active on your schedule." },
+  { q: 'What visa types do you support?', a: "Everyone — CPT, OPT, STEM OPT, H-1B, H-4 EAD, Green Card, and U.S. citizens. We factor your visa status into every search and application." },
+  { q: 'How fast do I see results?', a: "After completing onboarding (under 15 minutes), our team gets to work. You'll see prepared applications in your dashboard within 24–48 hours." },
+];
 
-    try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ name, email, password }),
-      });
+const AUDIENCES = [
+  'OPT Students','STEM OPT','H-1B Holders','H-4 EAD',
+  'Green Card','U.S. Citizens','Employed & Exploring','Recent Graduates',
+];
 
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({ error: 'Failed to create account.' }));
-        throw new Error(body.error || 'Failed to create account.');
-      }
+/* ════════════════════════════════════════════
+   CUSTOM CURSOR
+════════════════════════════════════════════ */
+function CustomCursor() {
+  const cx = useMotionValue(-100);
+  const cy = useMotionValue(-100);
+  const sx = useSpring(cx, { stiffness: 600, damping: 30 });
+  const sy = useSpring(cy, { stiffness: 600, damping: 30 });
+  const [hovered, setHovered] = useState(false);
+  const [clicked, setClicked]  = useState(false);
 
-      const body = await response.json();
-      setSuccess('Account created. Please verify your email before signing in.');
-      if (body.verificationLink) {
-        setVerificationLink(body.verificationLink);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create account.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  useEffect(() => {
+    const move = (e: MouseEvent) => { cx.set(e.clientX); cy.set(e.clientY); };
+    const over  = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      setHovered(!!t.closest('a,button,[role=button]'));
+    };
+    const down = () => setClicked(true);
+    const up   = () => setClicked(false);
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseover', over);
+    window.addEventListener('mousedown', down);
+    window.addEventListener('mouseup',   up);
+    document.documentElement.classList.add('has-custom-cursor');
+    return () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseover', over);
+      window.removeEventListener('mousedown', down);
+      window.removeEventListener('mouseup',   up);
+      document.documentElement.classList.remove('has-custom-cursor');
+    };
+  }, [cx, cy]);
 
   return (
-    <div className="min-h-screen">
-      <nav className="border-b border-slate-200/70 bg-slate-50/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black">
-              C
+    <>
+      {/* Dot */}
+      <motion.div
+        className="fixed top-0 left-0 z-[9999] pointer-events-none rounded-full"
+        style={{ x: sx, y: sy, translateX: '-50%', translateY: '-50%' }}
+        animate={{ width: clicked ? 6 : hovered ? 0 : 5, height: clicked ? 6 : hovered ? 0 : 5, background: '#14b8a6', opacity: hovered ? 0 : 1 }}
+        transition={{ duration: 0.15 }}
+      />
+      {/* Ring */}
+      <motion.div
+        className="fixed top-0 left-0 z-[9999] pointer-events-none rounded-full border"
+        style={{ x: sx, y: sy, translateX: '-50%', translateY: '-50%', borderColor: '#14b8a6' }}
+        animate={{ width: clicked ? 28 : hovered ? 44 : 28, height: clicked ? 28 : hovered ? 44 : 28, opacity: clicked ? 0.5 : 0.4, scale: clicked ? 0.8 : 1 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+      />
+    </>
+  );
+}
+
+/* ════════════════════════════════════════════
+   SCROLL PROGRESS BAR
+════════════════════════════════════════════ */
+function ScrollProgress() {
+  const { scrollYProgress } = useScroll();
+  const scaleX = useSpring(scrollYProgress, { stiffness: 100, damping: 30 });
+  return <motion.div id="scroll-bar" style={{ scaleX }} />;
+}
+
+/* ════════════════════════════════════════════
+   MAGNETIC BUTTON
+════════════════════════════════════════════ */
+function MagBtn({ children, href, className, onClick }: { children: React.ReactNode; href?: string; className?: string; onClick?: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const x   = useMotionValue(0);
+  const y   = useMotionValue(0);
+  const sx  = useSpring(x, { stiffness: 300, damping: 20 });
+  const sy  = useSpring(y, { stiffness: 300, damping: 20 });
+
+  const move = (e: React.MouseEvent) => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return;
+    x.set((e.clientX - r.left - r.width  / 2) * 0.35);
+    y.set((e.clientY - r.top  - r.height / 2) * 0.35);
+  };
+  const leave = () => { x.set(0); y.set(0); };
+
+  const inner = (
+    <motion.div ref={ref} style={{ x: sx, y: sy }} onMouseMove={move} onMouseLeave={leave} onClick={onClick} className={className}>
+      {children}
+    </motion.div>
+  );
+  return href?.startsWith('/') ? <Link href={href}>{inner}</Link> : <a href={href}>{inner}</a>;
+}
+
+/* ════════════════════════════════════════════
+   CHAR REVEAL
+════════════════════════════════════════════ */
+function CharReveal({ text, className, delay = 0 }: { text: string; className?: string; delay?: number }) {
+  return (
+    <span className={className} aria-label={text}>
+      {text.split('').map((ch, i) => (
+        <motion.span key={i} initial={{ opacity: 0, y: 18, filter: 'blur(4px)' }}
+          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+          transition={{ duration: 0.4, delay: delay + i * 0.028, ease: EASE }}
+          style={{ display: 'inline-block', whiteSpace: ch === ' ' ? 'pre' : 'normal' }}>
+          {ch === ' ' ? '\u00A0' : ch}
+        </motion.span>
+      ))}
+    </span>
+  );
+}
+
+/* ════════════════════════════════════════════
+   COUNT UP
+════════════════════════════════════════════ */
+function CountUp({ to, suffix = '', prefix = '' }: { to: number; suffix?: string; prefix?: string }) {
+  const [val, setVal] = useState(0);
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true, margin: '-80px' });
+  useEffect(() => {
+    if (!inView) return;
+    let start = 0;
+    const dur = 1400;
+    const step = to / dur * 16;
+    const iv = setInterval(() => {
+      start += step;
+      if (start >= to) { setVal(to); clearInterval(iv); }
+      else setVal(Math.floor(start));
+    }, 16);
+    return () => clearInterval(iv);
+  }, [inView, to]);
+  return <span ref={ref}>{prefix}{val}{suffix}</span>;
+}
+
+/* ════════════════════════════════════════════
+   TILT CARD
+════════════════════════════════════════════ */
+function TiltCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const rx  = useMotionValue(0);
+  const ry  = useMotionValue(0);
+  const srx = useSpring(rx, { stiffness: 200, damping: 20 });
+  const sry = useSpring(ry, { stiffness: 200, damping: 20 });
+
+  const move = (e: React.MouseEvent) => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return;
+    rx.set(((e.clientY - r.top)  / r.height - 0.5) * -14);
+    ry.set(((e.clientX - r.left) / r.width  - 0.5) *  14);
+  };
+  const leave = () => { rx.set(0); ry.set(0); };
+
+  return (
+    <motion.div ref={ref} onMouseMove={move} onMouseLeave={leave}
+      style={{ rotateX: srx, rotateY: sry, transformPerspective: 900 }}
+      className={className}>
+      {children}
+    </motion.div>
+  );
+}
+
+/* ════════════════════════════════════════════
+   PARTICLES
+════════════════════════════════════════════ */
+function Particles() {
+  const dots = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
+    id: i,
+    x: Math.random() * 100,
+    y: Math.random() * 100,
+    r: Math.random() * 2 + 1,
+    dur: Math.random() * 8 + 6,
+    delay: Math.random() * 5,
+  })), []);
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {dots.map(d => (
+        <motion.div key={d.id} className="absolute rounded-full"
+          style={{ left: `${d.x}%`, top: `${d.y}%`, width: d.r * 2, height: d.r * 2, background: '#14b8a6' }}
+          animate={{ y: [-20, 20, -20], opacity: [0.15, 0.5, 0.15] }}
+          transition={{ duration: d.dur, delay: d.delay, repeat: Infinity, ease: 'easeInOut' }} />
+      ))}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════
+   LIVE PREVIEW CARD
+════════════════════════════════════════════ */
+type Stage = 'scanning' | 'found' | 'preparing' | 'ready';
+function LivePreview() {
+  const [cidx, setCidx]   = useState(0);
+  const [stage, setStage] = useState<Stage>('scanning');
+  const [prog, setProg]   = useState(0);
+  const co = COMPANIES[cidx];
+  const next = useCallback(() => { setStage('scanning'); setProg(0); setCidx(i => (i+1)%COMPANIES.length); }, []);
+  useEffect(() => {
+    const ts = [
+      setTimeout(() => setStage('found'),     1200),
+      setTimeout(() => setStage('preparing'), 2800),
+      setTimeout(() => setStage('ready'),     5400),
+      setTimeout(next,                        8000),
+    ];
+    return () => ts.forEach(clearTimeout);
+  }, [cidx, next]);
+  useEffect(() => {
+    if (stage !== 'preparing') return;
+    let p = 0;
+    const iv = setInterval(() => { p = Math.min(p+2,100); setProg(p); if (p>=100) clearInterval(iv); }, 48);
+    return () => clearInterval(iv);
+  }, [stage]);
+
+  return (
+    <TiltCard>
+      <div className="doppelrand glow-surface w-full max-w-md mx-auto lg:mx-0">
+        <div className="doppelrand-inner overflow-hidden relative" style={{ minHeight: 280 }}>
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex gap-1.5">
+              {['#ff5f57','#febc2e','#28c840'].map(c=><span key={c} className="w-3 h-3 rounded-full" style={{background:c}}/>)}
             </div>
-            <span className="text-2xl font-display font-bold text-slate-900 tracking-tight">CareerOrbit</span>
+            <span className="text-[11px] font-semibold tracking-widest uppercase" style={{color:'var(--text-3)'}}>CareerOrbit</span>
+            <span className="flex items-center gap-1.5 text-[11px] font-bold text-teal-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-teal-400 pulse-ring"/>LIVE
+            </span>
           </div>
-          <div className="flex items-center gap-3">
-            <Link href="/login" className="px-4 py-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors">
-              Sign In
-            </Link>
-            <a href="#register" className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-teal-700 hover:bg-teal-800 transition-colors">
-              Create Account
-            </a>
-          </div>
-        </div>
-      </nav>
+          <div className="h-px bg-white/5 mb-5"/>
 
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 grid-pattern opacity-[0.12] pointer-events-none" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24 relative">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
-              className="lg:col-span-7"
-            >
-              <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider bg-teal-100 text-teal-800 mb-6">
-                Career Planning Platform
-              </span>
-              <h1 className="text-5xl md:text-6xl lg:text-7xl font-display font-black tracking-tight text-slate-900 leading-[0.95]">
-                Build Your Job
-                <span className="block text-teal-700">Momentum Daily.</span>
-              </h1>
-              <p className="mt-6 text-lg text-slate-600 max-w-2xl leading-relaxed">
-                One dashboard for applications, screening calls, interviews, assessments, and outcomes. Built for students who want clarity and
-                consistency.
-              </p>
-              <div className="mt-8 flex flex-wrap gap-4">
-                <a href="#register" className="inline-flex items-center gap-2 px-7 py-4 rounded-2xl bg-slate-900 text-white font-bold hover:bg-black transition-colors">
-                  Start Free <ArrowRight className="w-4 h-4" />
-                </a>
-                <Link href="/login" className="inline-flex items-center gap-2 px-7 py-4 rounded-2xl border border-slate-300 bg-white/80 text-slate-800 font-bold hover:bg-white transition-colors">
-                  Existing User Login
-                </Link>
-              </div>
-
-              <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {highlights.map((item) => (
-                  <div key={item.label} className="panel-surface rounded-2xl p-4">
-                    <p className="text-2xl font-black text-slate-900">{item.value}</p>
-                    <p className="text-xs uppercase tracking-wider text-slate-500 font-bold mt-1">{item.label}</p>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-
-            <motion.div
-              id="register"
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1, duration: 0.4 }}
-              className="lg:col-span-5 panel-surface rounded-3xl p-6 md:p-8"
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-11 h-11 rounded-2xl bg-teal-700 text-white flex items-center justify-center">
-                  <UserPlus className="w-5 h-5" />
+          <AnimatePresence mode="wait">
+            {stage==='scanning' && (
+              <motion.div key="sc" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} transition={{duration:0.3}} className="relative py-8">
+                <div className="scan-line"/>
+                <div className="flex flex-col items-center gap-3">
+                  <MagnifyingGlass size={32} weight="light" className="text-teal-400/60"/>
+                  <p className="text-sm font-medium" style={{color:'var(--text-3)'}}>Scanning opportunities<span className="cursor">_</span></p>
                 </div>
-                <div>
-                  <p className="text-lg font-bold text-slate-900">Create Student Account</p>
-                  <p className="text-sm text-slate-500">Instant access to your dashboard</p>
-                </div>
-              </div>
-
-              <a
-                href="/api/auth/google"
-                className="w-full flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                <Chrome className="w-4 h-4 text-slate-600" />
-                Continue with Google
-              </a>
-              <div className="my-4 flex items-center gap-3 text-xs text-slate-400">
-                <span className="flex-1 h-px bg-slate-200" />
-                or create with email
-                <span className="flex-1 h-px bg-slate-200" />
-              </div>
-
-              <form onSubmit={handleSignup} className="space-y-4">
-                {error && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
-                {success && (
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 mt-0.5 text-emerald-600" />
-                    <span>{success}</span>
-                  </div>
-                )}
-                {verificationLink && (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 break-all">
-                    Dev verification link: {verificationLink}
-                  </div>
-                )}
-
-                <div>
-                  <label className="text-sm font-semibold text-slate-700">Full Name</label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                    className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 outline-none focus:ring-2 focus:ring-teal-600/30"
-                    placeholder="Alex Johnson"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-semibold text-slate-700">Email</label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 outline-none focus:ring-2 focus:ring-teal-600/30"
-                    placeholder="you@college.edu"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-semibold text-slate-700">Password</label>
-                  <input
-                    type="password"
-                    minLength={8}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 outline-none focus:ring-2 focus:ring-teal-600/30"
-                    placeholder="At least 8 characters"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full mt-2 rounded-xl bg-teal-700 text-white py-3 font-bold hover:bg-teal-800 transition-colors disabled:opacity-70"
-                >
-                  {isSubmitting ? 'Creating Account...' : 'Create Account'}
-                </button>
-              </form>
-
-              <div className="mt-5 flex items-center gap-2 text-xs text-slate-500">
-                <ShieldCheck className="w-4 h-4 text-teal-700" />
-                Secure session with encrypted cookie authentication.
-              </div>
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="panel-surface rounded-3xl p-6">
-              <p className="text-sm uppercase tracking-wider text-slate-500 font-bold">Track</p>
-              <h3 className="mt-2 text-2xl font-display font-bold text-slate-900">Know Every Stage</h3>
-              <p className="mt-2 text-slate-600 text-sm">Applied, screening, interview, assessment, and offer in one timeline.</p>
-            </div>
-            <div className="panel-surface rounded-3xl p-6">
-              <p className="text-sm uppercase tracking-wider text-slate-500 font-bold">Prepare</p>
-              <h3 className="mt-2 text-2xl font-display font-bold text-slate-900">Calendar + Alerts</h3>
-              <p className="mt-2 text-slate-600 text-sm">Never miss calls, coding rounds, deadlines, or follow-up tasks.</p>
-            </div>
-            <div className="panel-surface rounded-3xl p-6">
-              <p className="text-sm uppercase tracking-wider text-slate-500 font-bold">Perform</p>
-              <h3 className="mt-2 text-2xl font-display font-bold text-slate-900">Outcome Focused</h3>
-              <p className="mt-2 text-slate-600 text-sm">Understand conversion rates and improve your process week by week.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-16 bg-slate-900 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between gap-4 flex-wrap mb-10">
-            <div>
-              <h2 className="text-3xl font-display font-bold">Student Success Stories</h2>
-              <p className="text-slate-300 mt-2">Real journeys from applications to offers.</p>
-            </div>
-            <div className="flex items-center gap-2 text-slate-200 text-sm">
-              <Building2 className="w-4 h-4" />
-              Trusted by top hiring teams
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {MOCK_PLACEMENTS.map((placement) => (
-              <div key={placement.id} className="rounded-3xl border border-slate-700 bg-slate-800/60 p-6">
-                <p className="text-slate-200 italic leading-relaxed">&quot;{placement.testimonial}&quot;</p>
-                <div className="mt-5 flex items-center justify-between">
+              </motion.div>
+            )}
+            {stage==='found' && (
+              <motion.div key="fo" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-10}} transition={{duration:0.4,ease:EASE}} className="space-y-4">
+                <p className="text-xs font-semibold uppercase tracking-wider" style={{color:'var(--text-3)'}}>Match found</p>
+                <div className="flex items-center gap-3 p-3 rounded-xl" style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.06)'}}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black"
+                    style={{background:`${co.color}20`,color:co.color,border:`1px solid ${co.color}30`}}>{co.name[0]}</div>
                   <div>
-                    <p className="font-bold">{placement.studentName}</p>
-                    <p className="text-sm text-slate-400">{placement.role}</p>
+                    <p className="text-sm font-bold" style={{color:'var(--text-1)'}}>{co.role}</p>
+                    <p className="text-xs" style={{color:'var(--text-2)'}}>{co.name} · Full-time</p>
                   </div>
-                  <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-400/15 text-emerald-300 px-3 py-1 text-xs font-semibold">
-                    <CheckCircle2 className="w-3 h-3" />
-                    {placement.companyName}
-                  </span>
                 </div>
-              </div>
+                <p className="text-xs" style={{color:'var(--text-3)'}}>Analysing role requirements…</p>
+              </motion.div>
+            )}
+            {stage==='preparing' && (
+              <motion.div key="pr" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-10}} transition={{duration:0.4,ease:EASE}} className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Sparkle size={16} weight="duotone" className="text-teal-400"/>
+                  <p className="text-xs text-teal-400 font-semibold uppercase tracking-wider">Preparing application</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black"
+                    style={{background:`${co.color}20`,color:co.color}}>{co.name[0]}</div>
+                  <div>
+                    <p className="text-sm font-bold" style={{color:'var(--text-1)'}}>{co.role}</p>
+                    <p className="text-xs" style={{color:'var(--text-2)'}}>{co.name}</p>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-[11px] mb-1.5" style={{color:'var(--text-3)'}}>
+                    <span>Tailoring resume</span><span>{prog}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-100" style={{width:`${prog}%`,background:'linear-gradient(to right,#14b8a6,#34d399)'}}/>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {[`${co.fields} fields`,'Cover letter','Role keywords','ATS optimised'].map((t,i)=>(
+                    <div key={t} className="flex items-center gap-1.5 text-[11px]" style={{color:'var(--text-3)'}}>
+                      {prog>=(i+1)*25
+                        ? <CheckCircle size={12} weight="fill" className="text-teal-400 shrink-0 check-pop"/>
+                        : <div className="w-3 h-3 rounded-full border border-white/10 shrink-0"/>}
+                      {t}
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+            {stage==='ready' && (
+              <motion.div key="rd" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-10}} transition={{duration:0.4,ease:EASE}} className="space-y-4">
+                <div className="p-3 rounded-xl flex items-center gap-2" style={{background:'rgba(20,184,166,0.06)',border:'1px solid rgba(20,184,166,0.2)'}}>
+                  <CheckCircle size={16} weight="fill" className="text-teal-400 shrink-0"/>
+                  <p className="text-sm font-semibold text-teal-300">Ready for your review</p>
+                </div>
+                <div className="space-y-2">
+                  {[`Resume tailored for role`,`All ${co.fields} fields filled`,'Cover letter drafted','ATS keywords embedded'].map(t=>(
+                    <div key={t} className="flex items-center gap-2 text-sm" style={{color:'var(--text-2)'}}>
+                      <CheckCircle size={14} weight="fill" className="text-teal-400 shrink-0"/>{t}
+                    </div>
+                  ))}
+                </div>
+                <button className="w-full mt-1 rounded-xl py-2.5 text-sm font-black flex items-center justify-center gap-2 glow-teal-sm hover:opacity-90 transition-opacity"
+                  style={{background:'#14b8a6',color:'#042f2e'}}>
+                  Review &amp; Submit
+                  <span className="flex items-center justify-center w-5 h-5 rounded-lg" style={{background:'rgba(4,47,46,0.3)'}}>
+                    <ArrowRight size={13} weight="bold"/>
+                  </span>
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="mt-5 flex items-center justify-center gap-1.5">
+            {COMPANIES.map((_,i)=>(
+              <span key={i} className="h-1 rounded-full transition-all duration-500"
+                style={{width:i===cidx?'20px':'6px',background:i===cidx?'#14b8a6':'rgba(255,255,255,0.1)'}}/>
             ))}
           </div>
         </div>
-      </section>
+      </div>
+    </TiltCard>
+  );
+}
+
+/* ════════════════════════════════════════════
+   INTERACTIVE FEATURE TABS
+════════════════════════════════════════════ */
+const FEAT_TABS = [
+  {
+    id: 'dashboard', label: 'Application Dashboard', Icon: ChartBar,
+    desc: 'Your entire pipeline — applied, screening, interview, assessment, offer — in one live view with activity graphs and status tracking.',
+    mockup: (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-[11px] font-bold uppercase tracking-wider" style={{color:'var(--text-3)'}}>Live Pipeline</p>
+          <TrendUp size={14} weight="bold" className="text-teal-400"/>
+        </div>
+        {[
+          {co:'Stripe', role:'Software Engineer', st:'Interview', c:'#22c55e'},
+          {co:'Figma', role:'Frontend Dev', st:'Screening', c:'#f59e0b'},
+          {co:'Notion', role:'Full-Stack Eng', st:'Applied', c:'#60a5fa'},
+          {co:'Vercel', role:'Backend Eng', st:'Assessment', c:'#a78bfa'},
+          {co:'Airbnb', role:'Product Eng', st:'Applied', c:'#60a5fa'},
+        ].map((r,i)=>(
+          <motion.div key={r.co} initial={{opacity:0,x:-10}} animate={{opacity:1,x:0}} transition={{delay:i*0.06,ease:EASE}}
+            className="flex items-center justify-between py-2 border-b last:border-0" style={{borderColor:'var(--border)'}}>
+            <div>
+              <p className="text-xs font-semibold" style={{color:'var(--text-1)'}}>{r.co}</p>
+              <p className="text-[10px]" style={{color:'var(--text-3)'}}>{r.role}</p>
+            </div>
+            <span className="flex items-center gap-1.5 text-[10px] font-bold rounded-full px-2 py-0.5"
+              style={{background:`${r.c}18`,color:r.c}}>
+              <span className="w-1.5 h-1.5 rounded-full" style={{background:r.c}}/>{r.st}
+            </span>
+          </motion.div>
+        ))}
+      </div>
+    ),
+  },
+  {
+    id: 'calendar', label: 'Events & Calendar', Icon: CalendarDots,
+    desc: 'All interviews, screenings, assessments, and calls on one color-coded calendar. Click any event to see full details and prep notes.',
+    mockup: (
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-[11px] font-bold uppercase tracking-wider" style={{color:'var(--text-3)'}}>March 2025</p>
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-center mb-3">
+          {['M','T','W','T','F','S','S'].map((d,i)=><p key={i} className="text-[9px] font-bold" style={{color:'var(--text-3)'}}>{d}</p>)}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {Array.from({length:31},(_,i)=>{
+            const events: Record<number,string> = {3:'#22c55e',8:'#f59e0b',12:'#60a5fa',17:'#22c55e',22:'#a78bfa',28:'#f59e0b'};
+            const c = events[i+1];
+            return (
+              <motion.div key={i} initial={{opacity:0,scale:0.8}} animate={{opacity:1,scale:1}} transition={{delay:i*0.01}}
+                className="aspect-square rounded-lg flex flex-col items-center justify-center text-[11px] font-medium"
+                style={{background: c?`${c}15`:'rgba(255,255,255,0.02)', color: c?c:'var(--text-3)', border: c?`1px solid ${c}30`:'1px solid transparent'}}>
+                {i+1}
+                {c && <span className="w-1 h-1 rounded-full mt-0.5" style={{background:c}}/>}
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: 'notifications', label: 'Smart Alerts', Icon: Bell,
+    desc: 'Real-time alerts for status changes, upcoming interviews, and deadline reminders. Never miss a critical moment in your search.',
+    mockup: (
+      <div className="space-y-2.5">
+        {[
+          {text:'Interview scheduled — Stripe, Mar 17 at 2pm', time:'2 min ago', c:'#22c55e', icon:'📅'},
+          {text:'Application prepared for Figma — ready to review', time:'1 hr ago', c:'#14b8a6', icon:'✅'},
+          {text:'Screening call — Notion, tomorrow 10am', time:'3 hr ago', c:'#f59e0b', icon:'📞'},
+          {text:'New match found: Staff Engineer @ Linear', time:'Today', c:'#a78bfa', icon:'🎯'},
+        ].map((n,i)=>(
+          <motion.div key={i} initial={{opacity:0,x:20}} animate={{opacity:1,x:0}} transition={{delay:i*0.08,ease:EASE}}
+            className="flex items-start gap-3 p-3 rounded-xl" style={{background:'rgba(255,255,255,0.03)',border:'1px solid var(--border)'}}>
+            <span className="text-base mt-0.5 shrink-0">{n.icon}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs leading-snug" style={{color:'var(--text-1)'}}>{n.text}</p>
+              <p className="text-[10px] mt-1" style={{color:'var(--text-3)'}}>{n.time}</p>
+            </div>
+            <span className="w-2 h-2 rounded-full shrink-0 mt-1" style={{background:n.c}}/>
+          </motion.div>
+        ))}
+      </div>
+    ),
+  },
+  {
+    id: 'ai', label: 'AI-Tailored Resumes', Icon: Sparkle,
+    desc: 'Every application gets a resume optimised for that exact role — right keywords, right format, ATS-ready. Automatically, every time.',
+    mockup: (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 p-3 rounded-xl" style={{background:'var(--accent-bg)',border:'1px solid var(--accent-bdr)'}}>
+          <Sparkle size={18} weight="duotone" className="text-teal-400 shrink-0"/>
+          <div>
+            <p className="text-xs font-bold" style={{color:'var(--text-1)'}}>Tailoring for Software Engineer @ Stripe</p>
+            <p className="text-[10px] mt-0.5" style={{color:'var(--text-3)'}}>Optimising 6 sections</p>
+          </div>
+        </div>
+        {[
+          {label:'Work Experience', pct:100, done:true},
+          {label:'Skills & Keywords', pct:100, done:true},
+          {label:'Summary', pct:88, done:false},
+          {label:'ATS Compatibility', pct:96, done:true},
+        ].map((s,i)=>(
+          <motion.div key={s.label} initial={{opacity:0}} animate={{opacity:1}} transition={{delay:i*0.1}}>
+            <div className="flex justify-between text-[11px] mb-1" style={{color:'var(--text-3)'}}>
+              <span className="flex items-center gap-1.5">
+                {s.done && <CheckCircle size={11} weight="fill" className="text-teal-400"/>}
+                {s.label}
+              </span>
+              <span style={{color: s.pct===100?'#14b8a6':'var(--text-2)'}}>{s.pct}%</span>
+            </div>
+            <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+              <motion.div initial={{width:0}} animate={{width:`${s.pct}%`}} transition={{delay:i*0.1+0.2,duration:0.8,ease:EASE}}
+                className="h-full rounded-full" style={{background: s.pct===100?'linear-gradient(to right,#14b8a6,#34d399)':'rgba(255,255,255,0.2)'}}/>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    ),
+  },
+  {
+    id: 'prep', label: 'Interview Prep', Icon: BookOpen,
+    desc: 'Curated study guides, screening scripts, and phone prep materials for every stage. Download PDFs and go in confident.',
+    mockup: (
+      <div className="space-y-2.5">
+        {[
+          {title:'Screening Call Guide', pages:12, tag:'Screening', c:'#f59e0b'},
+          {title:'Technical Interview Prep', pages:28, tag:'Interview', c:'#22c55e'},
+          {title:'Phone Call Scripts', pages:8, tag:'Phone', c:'#60a5fa'},
+          {title:'Behavioural Questions', pages:16, tag:'Interview', c:'#22c55e'},
+        ].map((g,i)=>(
+          <motion.div key={g.title} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{delay:i*0.07,ease:EASE}}
+            className="flex items-center justify-between p-3 rounded-xl" style={{background:'rgba(255,255,255,0.03)',border:'1px solid var(--border)'}}>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{background:`${g.c}15`,border:`1px solid ${g.c}30`}}>
+                <FileText size={14} weight="duotone" style={{color:g.c}}/>
+              </div>
+              <div>
+                <p className="text-xs font-semibold" style={{color:'var(--text-1)'}}>{g.title}</p>
+                <p className="text-[10px]" style={{color:'var(--text-3)'}}>{g.pages} pages</p>
+              </div>
+            </div>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:`${g.c}15`,color:g.c}}>{g.tag}</span>
+          </motion.div>
+        ))}
+      </div>
+    ),
+  },
+];
+
+function FeatureTabs() {
+  const [active, setActive] = useState('dashboard');
+  const feat = FEAT_TABS.find(f => f.id===active)!;
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      {/* Tab list */}
+      <div className="lg:col-span-2 flex flex-col gap-2">
+        {FEAT_TABS.map(f => (
+          <button key={f.id} onClick={() => setActive(f.id)}
+            className={`feature-tab flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left border transition-all ${active===f.id ? 'feature-tab-active' : 'border-transparent hover:border-white/5 hover:bg-white/[0.02]'}`}>
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all ${active===f.id ? 'bg-teal-500/20 border border-teal-500/30' : 'bg-white/[0.03] border border-white/5'}`}>
+              <f.Icon size={18} weight="duotone" className={active===f.id ? 'text-teal-400' : 'text-slate-500'}/>
+            </div>
+            <div>
+              <p className={`text-sm font-semibold transition-colors ${active===f.id ? 'text-teal-300' : 'text-slate-400'}`}>{f.label}</p>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* Mockup panel */}
+      <div className="lg:col-span-3">
+        <div className="doppelrand rounded-3xl h-full" style={{minHeight:400}}>
+          <div className="doppelrand-inner h-full flex flex-col">
+            <div className="mb-5 pb-4" style={{borderBottom:'1px solid var(--border)'}}>
+              <div className="flex items-center gap-2 mb-1">
+                <feat.Icon size={16} weight="duotone" className="text-teal-400"/>
+                <p className="text-sm font-bold" style={{color:'var(--text-1)'}}>{feat.label}</p>
+              </div>
+              <p className="text-xs leading-relaxed" style={{color:'var(--text-2)'}}>{feat.desc}</p>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <AnimatePresence mode="wait">
+                <motion.div key={active}
+                  initial={{opacity:0,y:12,filter:'blur(4px)'}}
+                  animate={{opacity:1,y:0,filter:'blur(0px)'}}
+                  exit={{opacity:0,y:-8,filter:'blur(2px)'}}
+                  transition={{duration:0.35,ease:EASE}}
+                  className="h-full">
+                  {feat.mockup}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+  );
+}
+
+/* ════════════════════════════════════════════
+   FADE IN
+════════════════════════════════════════════ */
+function FadeIn({ children, delay=0, className='' }: { children:React.ReactNode; delay?:number; className?:string }) {
+  return (
+    <motion.div initial={{opacity:0,y:24}} whileInView={{opacity:1,y:0}} viewport={{once:true}}
+      transition={{duration:0.6,delay,ease:EASE}} className={className}>{children}</motion.div>
+  );
+}
+
+/* ════════════════════════════════════════════
+   FAQ ITEM
+════════════════════════════════════════════ */
+function FaqItem({ q, a, idx }: { q:string; a:string; idx:number }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <motion.div initial={{opacity:0,y:12}} whileInView={{opacity:1,y:0}} viewport={{once:true}}
+      transition={{delay:idx*0.06,ease:EASE}}
+      className="surface rounded-2xl overflow-hidden" style={{transition:'border-color 0.2s'}}>
+      <button onClick={()=>setOpen(!open)}
+        className="w-full flex items-center justify-between px-6 py-5 text-left hover:bg-white/[0.02] transition-colors">
+        <span className="font-semibold pr-4 text-[15px] leading-snug" style={{color:'var(--text-1)'}}>{q}</span>
+        <motion.div animate={{rotate:open?180:0}} transition={{duration:0.3,ease:EASE}}>
+          <CaretDown size={16} weight="bold" style={{color:open?'#14b8a6':'var(--text-3)'}}/>
+        </motion.div>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div initial={{height:0,opacity:0}} animate={{height:'auto',opacity:1}} exit={{height:0,opacity:0}}
+            transition={{duration:0.32,ease:EASE}}>
+            <p className="px-6 pb-5 text-sm leading-relaxed border-t border-white/5 pt-4" style={{color:'var(--text-2)'}}>{a}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+/* ════════════════════════════════════════════
+   MAIN PAGE
+════════════════════════════════════════════ */
+export default function LandingPage() {
+  const [name,setName]         = useState('');
+  const [email,setEmail]       = useState('');
+  const [password,setPassword] = useState('');
+  const [sub,setSub]           = useState(false);
+  const [err,setErr]           = useState('');
+  const [ok,setOk]             = useState('');
+  const [verLink,setVerLink]   = useState('');
+
+  const handleSignup = async (e:{preventDefault():void}) => {
+    e.preventDefault(); setErr(''); setOk(''); setVerLink(''); setSub(true);
+    try {
+      const r = await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({name,email,password})});
+      if (!r.ok) { const b=await r.json().catch(()=>({error:'Failed.'})); throw new Error(b.error||'Failed.'); }
+      const b=await r.json();
+      setOk('Account created! Verify your email to sign in.');
+      if (b.verificationLink) setVerLink(b.verificationLink);
+    } catch(e) { setErr(e instanceof Error?e.message:'Failed.'); }
+    finally { setSub(false); }
+  };
+
+  const STEPS = [
+    {Icon:FileText,        n:'01',title:'Share Profile',      desc:'One-time setup — your resume, target roles, visa status, preferences.'},
+    {Icon:MagnifyingGlass, n:'02',title:'We Source Roles',    desc:'Our team scans company portals daily and matches openings to your profile.'},
+    {Icon:Sparkle,         n:'03',title:'We Prep Everything', desc:'Resume tailored per role, every field filled, all responses drafted.'},
+    {Icon:CursorClick,     n:'04',title:'You Submit',         desc:'One click. You stay the applicant — 100% legal and compliant.'},
+  ];
+
+  return (
+    <>
+      <CustomCursor />
+      <ScrollProgress />
+
+      <div className="min-h-screen antialiased" style={{background:'var(--base)',color:'var(--text-1)'}}>
+
+        {/* ── ISLAND NAV ── */}
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 w-full max-w-2xl px-4">
+          <nav className="island-nav rounded-full px-5 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-teal-500 flex items-center justify-center font-black text-[10px] text-[#042f2e]">CO</div>
+              <span className="font-bold text-sm tracking-tight" style={{color:'var(--text-1)'}}>CareerOrbit</span>
+            </div>
+            <div className="hidden sm:flex items-center gap-5 text-[13px]" style={{color:'var(--text-2)'}}>
+              {['How It Works','Features','FAQ'].map((l,i)=>(
+                <a key={l} href={`#${['how-it-works','features','faq'][i]}`} className="link-accent hover:text-white transition-colors">{l}</a>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <Link href="/login" className="text-[13px] hover:text-white transition-colors px-2 py-1" style={{color:'var(--text-2)'}}>Sign In</Link>
+              <a href="#register" className="btn-accent px-4 py-1.5 text-[13px]">Get Started</a>
+            </div>
+          </nav>
+        </div>
+
+        {/* ── HERO ── */}
+        <section className="relative min-h-screen flex items-center pt-24 pb-16 overflow-hidden">
+          <div className="absolute inset-0 dot-grid"/>
+          <Particles/>
+          <div className="orb-a absolute -top-32 -left-32 w-[700px] h-[700px] rounded-full pointer-events-none"
+            style={{background:'radial-gradient(circle,rgba(20,184,166,0.07) 0%,transparent 70%)'}}/>
+          <div className="orb-b absolute top-1/3 right-0 w-[600px] h-[600px] rounded-full pointer-events-none"
+            style={{background:'radial-gradient(circle,rgba(56,189,248,0.04) 0%,transparent 70%)'}}/>
+          <div className="absolute bottom-0 left-0 right-0 h-48 pointer-events-none"
+            style={{background:'linear-gradient(to top,var(--base),transparent)'}}/>
+
+          <div className="relative max-w-7xl mx-auto px-5 sm:px-8 w-full">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-center">
+
+              <div className="lg:col-span-7 space-y-8">
+                <motion.div initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} transition={{duration:0.5,ease:EASE}}>
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest"
+                    style={{background:'var(--accent-bg)',border:'1px solid var(--accent-bdr)',color:'#5eead4'}}>
+                    <Lightning size={12} weight="fill"/>
+                    Reverse Recruiting Agency
+                  </div>
+                </motion.div>
+
+                <div className="space-y-1">
+                  <motion.div initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} transition={{duration:0.5,delay:0.1,ease:EASE}}>
+                    <h1 className="display text-[clamp(52px,7vw,88px)]" style={{color:'var(--text-1)'}}>We apply to</h1>
+                  </motion.div>
+                  <h1 className="display text-[clamp(52px,7vw,88px)] g-text-hero">
+                    <CharReveal text="jobs for you." delay={0.25}/>
+                  </h1>
+                </div>
+
+                <motion.p initial={{opacity:0}} animate={{opacity:1}} transition={{delay:0.7,duration:0.6}}
+                  className="text-[17px] max-w-lg leading-relaxed" style={{color:'var(--text-2)'}}>
+                  Stop spending 40+ hours a week on job applications. Our team sources roles, tailors your resume, and preps every field — you review and hit submit.
+                </motion.p>
+
+                <motion.div initial={{opacity:0}} animate={{opacity:1}} transition={{delay:0.85}}
+                  className="flex items-center gap-2 text-sm" style={{color:'var(--text-3)'}}>
+                  <CheckCircle size={15} weight="fill" className="text-teal-500 shrink-0"/>
+                  <span>OPT · STEM OPT · H-1B · H-4 · Green Card · U.S. Citizens · Everyone</span>
+                </motion.div>
+
+                <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} transition={{delay:1,ease:EASE}} className="flex flex-wrap gap-3">
+                  <MagBtn href="#register" className="btn-accent inline-flex items-center gap-2.5 px-6 py-3 text-[15px]">
+                    Start Free
+                    <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-teal-600/40">
+                      <ArrowRight size={14} weight="bold"/>
+                    </span>
+                  </MagBtn>
+                  <MagBtn href="#how-it-works" className="btn-ghost inline-flex items-center gap-2 px-6 py-3 text-[15px]">
+                    How It Works
+                  </MagBtn>
+                </motion.div>
+
+                {/* Counting stats */}
+                <motion.div initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} transition={{delay:1.1,ease:EASE}}
+                  className="grid grid-cols-3 gap-3">
+                  {[
+                    {to:50,suffix:'+',label:'Applications per day'},
+                    {to:90,suffix:'%',label:'Work done for you'},
+                    {to:24,suffix:'hr',label:'First apps ready'},
+                  ].map(s=>(
+                    <div key={s.label} className="doppelrand rounded-2xl">
+                      <div className="doppelrand-inner py-3">
+                        <p className="text-xl font-black" style={{color:'var(--text-1)'}}>
+                          <CountUp to={s.to} suffix={s.suffix}/>
+                        </p>
+                        <p className="text-[11px] font-medium mt-0.5 leading-snug" style={{color:'var(--text-3)'}}>{s.label}</p>
+                      </div>
+                    </div>
+                  ))}
+                </motion.div>
+              </div>
+
+              <motion.div initial={{opacity:0,x:32}} animate={{opacity:1,x:0}} transition={{delay:0.18,duration:0.7,ease:EASE}}
+                className="lg:col-span-5">
+                <LivePreview/>
+              </motion.div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── MARQUEE ── */}
+        <div className="border-y overflow-hidden py-4" style={{borderColor:'var(--border)',background:'var(--surface-1)'}}>
+          <div className="flex">
+            <div className="marquee-track flex gap-4 whitespace-nowrap">
+              {[...AUDIENCES,...AUDIENCES].map((a,i)=>(
+                <span key={i} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-medium"
+                  style={{background:'rgba(255,255,255,0.03)',border:'1px solid var(--border)',color:'var(--text-2)'}}>
+                  {a}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ── PROBLEM ── */}
+        <section className="py-28 relative overflow-hidden">
+          <div className="orb-a absolute right-0 top-0 w-[400px] h-[400px] rounded-full pointer-events-none"
+            style={{background:'radial-gradient(circle,rgba(239,68,68,0.04) 0%,transparent 70%)'}}/>
+          <div className="max-w-6xl mx-auto px-5 sm:px-8">
+            <FadeIn>
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest mb-8"
+                style={{background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',color:'#f87171'}}>
+                The Problem
+              </div>
+            </FadeIn>
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+              <FadeIn className="lg:col-span-2" delay={0.05}>
+                <TiltCard>
+                  <div className="doppelrand rounded-3xl h-full">
+                    <div className="doppelrand-inner flex flex-col justify-between h-full" style={{minHeight:280}}>
+                      <Clock size={32} weight="duotone" className="text-red-400/80 mb-6"/>
+                      <div>
+                        <p className="font-black leading-none mb-3" style={{color:'var(--text-1)',fontSize:'clamp(48px,4vw,64px)'}}>
+                          <CountUp to={40} suffix="+"/>
+                        </p>
+                        <p className="text-base leading-relaxed" style={{color:'var(--text-2)'}}>
+                          Hours per week the average job seeker spends searching, tailoring, and applying. Time you simply don&apos;t have.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </TiltCard>
+              </FadeIn>
+              <div className="lg:col-span-3 flex flex-col gap-6">
+                {[
+                  {Icon:Briefcase,c:'rgba(251,191,36,0.1)',bc:'rgba(251,191,36,0.2)',ic:'text-amber-400',title:'Tight Visa Windows',desc:"OPT gives you ~3 months. H-1B layoffs give you 30–60 days. Every wasted hour searching instead of preparing costs you."},
+                  {Icon:Users,c:'rgba(96,165,250,0.1)',bc:'rgba(96,165,250,0.2)',ic:'text-blue-400',title:'Brutal Competition',desc:'Good roles get hundreds of applications in hours. Consistency and volume wins — we keep you active every single day.'},
+                ].map((card,i)=>(
+                  <FadeIn key={card.title} delay={0.1+i*0.08}>
+                    <TiltCard>
+                      <div className="doppelrand rounded-3xl">
+                        <div className="doppelrand-inner">
+                          <div className="flex items-start gap-4">
+                            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                              style={{background:card.c,border:`1px solid ${card.bc}`}}>
+                              <card.Icon size={20} weight="duotone" className={card.ic}/>
+                            </div>
+                            <div>
+                              <p className="text-lg font-bold mb-1.5" style={{color:'var(--text-1)'}}>{card.title}</p>
+                              <p className="text-sm leading-relaxed" style={{color:'var(--text-2)'}}>{card.desc}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </TiltCard>
+                  </FadeIn>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── HOW IT WORKS ── */}
+        <section id="how-it-works" className="py-28 relative" style={{background:'var(--surface-1)'}}>
+          <div className="max-w-6xl mx-auto px-5 sm:px-8">
+            <FadeIn className="mb-16">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest mb-5"
+                style={{background:'var(--accent-bg)',border:'1px solid var(--accent-bdr)',color:'#5eead4'}}>
+                How It Works
+              </div>
+              <h2 className="display text-[clamp(36px,5vw,60px)]" style={{color:'var(--text-1)'}}>
+                We do <span className="g-text">90% of the work.</span>
+              </h2>
+              <p className="mt-4 text-[17px] max-w-lg leading-relaxed" style={{color:'var(--text-2)'}}>
+                Simple, legal, scalable. You stay in control at every step.
+              </p>
+            </FadeIn>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-px relative">
+              {STEPS.map((s,i)=>(
+                <FadeIn key={s.n} delay={i*0.12}>
+                  <div className="relative h-full">
+                    {i<3 && <div className="step-connector hidden md:block"/>}
+                    <div className="doppelrand rounded-3xl h-full mr-px">
+                      <div className="doppelrand-inner relative overflow-hidden h-full" style={{minHeight:220}}>
+                        <span className="absolute -bottom-3 -right-1 text-[80px] font-black pointer-events-none select-none leading-none"
+                          style={{color:'rgba(255,255,255,0.025)'}}>{s.n}</span>
+                        <motion.div whileHover={{scale:1.08,rotate:3}} transition={{type:'spring',stiffness:300,damping:20}}
+                          className="relative w-11 h-11 rounded-2xl flex items-center justify-center mb-5"
+                          style={{background:'var(--accent-bg)',border:'1px solid var(--accent-bdr)'}}>
+                          <s.Icon size={20} weight="duotone" className="text-teal-400"/>
+                        </motion.div>
+                        <p className="font-bold mb-1.5" style={{color:'var(--text-1)'}}>{s.title}</p>
+                        <p className="text-sm leading-relaxed" style={{color:'var(--text-2)'}}>{s.desc}</p>
+                      </div>
+                    </div>
+                  </div>
+                </FadeIn>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── FEATURES TABS ── */}
+        <section id="features" className="py-28">
+          <div className="max-w-6xl mx-auto px-5 sm:px-8">
+            <FadeIn className="mb-14">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest mb-5"
+                style={{background:'rgba(255,255,255,0.04)',border:'1px solid var(--border-md)',color:'var(--text-2)'}}>
+                The Platform
+              </div>
+              <h2 className="display text-[clamp(36px,5vw,60px)]" style={{color:'var(--text-1)'}}>
+                Your career <span className="g-text">command center.</span>
+              </h2>
+            </FadeIn>
+            <FadeIn delay={0.1}>
+              <FeatureTabs/>
+            </FadeIn>
+          </div>
+        </section>
+
+        {/* ── TESTIMONIALS ── */}
+        <section className="py-28 relative overflow-hidden" style={{background:'var(--surface-1)'}}>
+          <div className="orb-b absolute -left-32 bottom-0 w-[500px] h-[500px] rounded-full pointer-events-none"
+            style={{background:'radial-gradient(circle,rgba(20,184,166,0.05) 0%,transparent 70%)'}}/>
+          <div className="max-w-6xl mx-auto px-5 sm:px-8 relative">
+            <FadeIn className="mb-14">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest mb-5"
+                style={{background:'var(--accent-bg)',border:'1px solid var(--accent-bdr)',color:'#5eead4'}}>
+                Student Stories
+              </div>
+              <h2 className="display text-[clamp(36px,5vw,60px)]" style={{color:'var(--text-1)'}}>
+                Real journeys.<br/>Real offers.
+              </h2>
+            </FadeIn>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {MOCK_PLACEMENTS.map((p,i)=>(
+                <FadeIn key={p.id} delay={i*0.1}>
+                  <TiltCard className="h-full">
+                    <div className="doppelrand rounded-3xl h-full">
+                      <div className="doppelrand-inner h-full flex flex-col">
+                        <span className="text-5xl font-black leading-none mb-2 select-none" style={{color:'rgba(20,184,166,0.15)'}}>&ldquo;</span>
+                        <p className="text-[15px] leading-relaxed flex-1" style={{color:'var(--text-2)'}}>{p.testimonial}</p>
+                        <div className="mt-6 pt-5 flex items-center justify-between" style={{borderTop:'1px solid var(--border)'}}>
+                          <div>
+                            <p className="font-bold" style={{color:'var(--text-1)'}}>{p.studentName}</p>
+                            <p className="text-sm" style={{color:'var(--text-3)'}}>{p.role}</p>
+                          </div>
+                          {p.companyName && (
+                            <span className="flex items-center gap-1.5 rounded-xl text-[12px] font-bold px-3 py-1.5"
+                              style={{background:'var(--accent-bg)',border:'1px solid var(--accent-bdr)',color:'#5eead4'}}>
+                              <SealCheck size={14} weight="fill"/>{p.companyName}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </TiltCard>
+                </FadeIn>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── SIGN UP ── */}
+        <section id="register" className="py-28">
+          <div className="max-w-2xl mx-auto px-5 sm:px-8">
+            <FadeIn className="mb-10 text-center">
+              <h2 className="display text-[clamp(32px,4vw,52px)] mb-3" style={{color:'var(--text-1)'}}>Create your account</h2>
+              <p style={{color:'var(--text-2)'}}>Free to start — no credit card required.</p>
+            </FadeIn>
+            <FadeIn delay={0.1}>
+              <div className="doppelrand rounded-3xl">
+                <div className="doppelrand-inner">
+                  <div className="flex items-center gap-3 mb-7">
+                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
+                      style={{background:'var(--accent-bg)',border:'1px solid var(--accent-bdr)'}}>
+                      <UserPlus size={20} weight="duotone" className="text-teal-400"/>
+                    </div>
+                    <div>
+                      <p className="font-bold" style={{color:'var(--text-1)'}}>Student Account</p>
+                      <p className="text-sm" style={{color:'var(--text-3)'}}>Instant access to your dashboard</p>
+                    </div>
+                  </div>
+                  <a href="/api/auth/google"
+                    className="w-full flex items-center justify-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all hover:bg-white/5 mb-5"
+                    style={{background:'rgba(255,255,255,0.03)',border:'1px solid var(--border-md)',color:'var(--text-2)'}}>
+                    <svg className="w-4 h-4" viewBox="0 0 24 24">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    Continue with Google
+                  </a>
+                  <div className="flex items-center gap-3 text-xs mb-5" style={{color:'var(--text-3)'}}>
+                    <span className="flex-1 h-px" style={{background:'var(--border)'}}/> or sign up with email
+                    <span className="flex-1 h-px" style={{background:'var(--border)'}}/>
+                  </div>
+                  <form onSubmit={handleSignup} className="space-y-4">
+                    {err && <div className="rounded-xl px-4 py-2.5 text-sm" style={{background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',color:'#fca5a5'}}>{err}</div>}
+                    {ok  && <div className="rounded-xl px-4 py-2.5 text-sm flex items-center gap-2" style={{background:'var(--accent-bg)',border:'1px solid var(--accent-bdr)',color:'#5eead4'}}><CheckCircle size={16} weight="fill" className="shrink-0"/>{ok}</div>}
+                    {verLink && <div className="rounded-xl px-4 py-2.5 text-xs break-all" style={{background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.2)',color:'#fcd34d'}}>Dev: {verLink}</div>}
+                    {[
+                      {l:'Full Name',t:'text',    v:name,    s:setName,    p:'Your full name'},
+                      {l:'Email',    t:'email',   v:email,   s:setEmail,   p:'you@university.edu'},
+                      {l:'Password', t:'password',v:password,s:setPassword,p:'Min. 8 characters',min:8},
+                    ].map(f=>(
+                      <div key={f.l}>
+                        <label className="block text-[11px] font-bold uppercase tracking-widest mb-1.5" style={{color:'var(--text-3)'}}>{f.l}</label>
+                        <input type={f.t} value={f.v} onChange={e=>f.s(e.target.value)} required minLength={f.min} placeholder={f.p}
+                          className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all"
+                          style={{background:'var(--base)',border:'1px solid var(--border-md)',color:'var(--text-1)'}}
+                          onFocus={e=>e.currentTarget.style.borderColor='var(--accent-bdr)'}
+                          onBlur={e=>e.currentTarget.style.borderColor='var(--border-md)'}/>
+                      </div>
+                    ))}
+                    <button type="submit" disabled={sub}
+                      className="btn-accent w-full py-3 text-sm flex items-center justify-center gap-2.5 mt-1 disabled:opacity-50">
+                      {sub?'Creating account…':'Create Free Account'}
+                      {!sub && <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-teal-600/40"><ArrowRight size={14} weight="bold"/></span>}
+                    </button>
+                  </form>
+                  <div className="mt-5 flex items-center gap-2 text-xs" style={{color:'var(--text-3)'}}>
+                    <ShieldCheck size={14} weight="duotone" className="text-teal-600 shrink-0"/>
+                    Encrypted sessions. Your data is never sold or shared.
+                  </div>
+                </div>
+              </div>
+            </FadeIn>
+          </div>
+        </section>
+
+        {/* ── FAQ ── */}
+        <section id="faq" className="py-24" style={{background:'var(--surface-1)'}}>
+          <div className="max-w-2xl mx-auto px-5 sm:px-8">
+            <FadeIn className="mb-12 text-center">
+              <h2 className="display text-[clamp(32px,4vw,52px)]" style={{color:'var(--text-1)'}}>Questions</h2>
+            </FadeIn>
+            <div className="space-y-2">
+              {FAQ_DATA.map((item,i)=><FaqItem key={i} q={item.q} a={item.a} idx={i}/>)}
+            </div>
+          </div>
+        </section>
+
+        {/* ── BOTTOM CTA ── */}
+        <section className="py-32 relative overflow-hidden">
+          <div className="absolute inset-0 dot-grid"/>
+          <div className="orb-a absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] rounded-full pointer-events-none"
+            style={{background:'radial-gradient(circle,rgba(20,184,166,0.07) 0%,transparent 65%)'}}/>
+          <FadeIn className="max-w-3xl mx-auto px-5 sm:px-8 text-center relative">
+            <h2 className="display text-[clamp(40px,6vw,76px)] mb-2" style={{color:'var(--text-1)'}}>Stop applying alone.</h2>
+            <h2 className="display text-[clamp(40px,6vw,76px)] g-text-hero mb-6">Let us work for you.</h2>
+            <p className="text-[17px] max-w-lg mx-auto mb-10 leading-relaxed" style={{color:'var(--text-2)'}}>
+              Join the students who let CareerOrbit handle the grind — so they can focus on preparing and performing.
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              <MagBtn href="#register" className="btn-accent inline-flex items-center gap-2.5 px-9 py-4 text-base">
+                Create Free Account
+                <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-teal-600/40"><ArrowRight size={14} weight="bold"/></span>
+              </MagBtn>
+              <MagBtn href="/login" className="btn-ghost inline-flex items-center gap-2 px-9 py-4 text-base">Sign In</MagBtn>
+            </div>
+          </FadeIn>
+        </section>
+
+        {/* ── FOOTER ── */}
+        <footer className="py-12" style={{borderTop:'1px solid var(--border)',background:'var(--surface-1)'}}>
+          <div className="max-w-6xl mx-auto px-5 sm:px-8">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-7 h-7 rounded-lg bg-teal-500 flex items-center justify-center font-black text-[10px] text-[#042f2e]">CO</div>
+                  <span className="font-bold text-sm" style={{color:'var(--text-1)'}}>CareerOrbit</span>
+                </div>
+                <p className="text-sm max-w-xs leading-relaxed" style={{color:'var(--text-3)'}}>A reverse recruiting agency. We work for you, not the employer.</p>
+              </div>
+              <div className="flex gap-10 text-sm">
+                {[
+                  {title:'Platform',links:[{l:'How It Works',h:'#how-it-works'},{l:'Features',h:'#features'},{l:'FAQ',h:'#faq'}]},
+                  {title:'Account', links:[{l:'Sign Up',h:'#register'},{l:'Sign In',h:'/login',ext:true}]},
+                ].map(col=>(
+                  <div key={col.title}>
+                    <p className="font-semibold mb-3" style={{color:'var(--text-1)'}}>{col.title}</p>
+                    <ul className="space-y-2">
+                      {col.links.map(lk=>(
+                        <li key={lk.l}>
+                          {lk.ext
+                            ? <Link href={lk.h} className="link-accent hover:text-white transition-colors" style={{color:'var(--text-3)'}}>{lk.l}</Link>
+                            : <a href={lk.h} className="link-accent hover:text-white transition-colors" style={{color:'var(--text-3)'}}>{lk.l}</a>}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="mt-10 pt-6 text-xs text-center" style={{borderTop:'1px solid var(--border)',color:'var(--text-3)'}}>
+              © {new Date().getFullYear()} CareerOrbit. All rights reserved.
+            </div>
+          </div>
+        </footer>
+      </div>
+    </>
   );
 }

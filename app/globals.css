@@ -1,30 +1,168 @@
 @import "tailwindcss";
 
+/* ─── Design tokens ─────────────────────── */
 :root {
-  --brand-ink: #0f172a;
-  --brand-canvas: #f4f7fb;
-  --brand-panel: #ffffff;
-  --brand-line: #dbe3ef;
-  --brand-accent: #0f766e;
-  --brand-accent-soft: #ccfbf1;
-  --brand-warm: #b45309;
+  --base:        #090c15;
+  --surface-1:   #0e1220;
+  --surface-2:   #131826;
+  --surface-3:   #181e2e;
+  --border:      rgba(255,255,255,0.06);
+  --border-md:   rgba(255,255,255,0.10);
+  --border-hi:   rgba(255,255,255,0.16);
+  --accent:      #14b8a6;
+  --accent-lt:   #2dd4bf;
+  --accent-bg:   rgba(20,184,166,0.07);
+  --accent-bdr:  rgba(20,184,166,0.22);
+  --text-1:      #f1f5f9;
+  --text-2:      #8b9ab0;
+  --text-3:      #3d4e63;
+
+  /* legacy dashboard tokens */
+  --brand-ink:        #0f172a;
+  --brand-canvas:     #f4f7fb;
+  --brand-panel:      #ffffff;
+  --brand-line:       #dbe3ef;
+  --brand-accent:     #0f766e;
+  --brand-accent-soft:#ccfbf1;
+  --brand-warm:       #b45309;
 }
 
-body {
-  background: radial-gradient(circle at 10% -10%, #dbeafe 0%, transparent 38%),
-    radial-gradient(circle at 110% 10%, #d1fae5 0%, transparent 35%),
-    var(--brand-canvas);
-  color: var(--brand-ink);
+/* ─── Reset ─────────────────────────────── */
+body { background: var(--brand-canvas); color: var(--brand-ink); }
+html { scroll-behavior: smooth; }
+
+/* ─── Custom cursor ──────────────────────── */
+.has-custom-cursor * { cursor: none !important; }
+
+/* ─── Typography ─────────────────────────── */
+.display {
+  font-family: var(--font-display), var(--font-sans), sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
 }
 
+/* ─── Legacy panel (dashboard) ───────────── */
 .panel-surface {
   background: color-mix(in oklab, white 92%, #e2e8f0 8%);
   border: 1px solid var(--brand-line);
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 16px 40px rgba(15,23,42,0.05);
 }
 
-.grid-pattern {
-  background-image: linear-gradient(to right, rgba(15, 23, 42, 0.08) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(15, 23, 42, 0.08) 1px, transparent 1px);
-  background-size: 28px 28px;
+/* ─── Doppelrand (double-bezel) ──────────── */
+.doppelrand {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 5px;
 }
+.doppelrand-inner {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 19px;
+  padding: 22px;
+  height: 100%;
+}
+
+/* ─── Surface ─────────────────────────────── */
+.surface { background: var(--surface-1); border: 1px solid var(--border); }
+
+/* ─── Gradient text ──────────────────────── */
+.g-text      { background: linear-gradient(115deg,#2dd4bf 0%,#34d399 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.g-text-hero { background: linear-gradient(110deg,#5eead4 0%,#2dd4bf 40%,#34d399 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+
+/* ─── Island nav ─────────────────────────── */
+.island-nav {
+  background: rgba(9,12,21,0.88);
+  border: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 4px 40px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.04) inset;
+}
+
+/* ─── Buttons ────────────────────────────── */
+.btn-accent {
+  background: var(--accent);
+  color: #042f2e;
+  font-weight: 800;
+  border-radius: 14px;
+  transition: background 0.2s cubic-bezier(0.22,1,0.36,1), box-shadow 0.2s;
+}
+.btn-accent:hover { background: var(--accent-lt); box-shadow: 0 8px 32px rgba(20,184,166,0.3); }
+.btn-ghost {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: #94a3b8;
+  font-weight: 700;
+  border-radius: 14px;
+  transition: background 0.2s, border-color 0.2s;
+}
+.btn-ghost:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.14); }
+
+/* ─── Card effects ───────────────────────── */
+.card-lift { transition: box-shadow 0.3s; }
+.card-lift:hover { box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
+
+/* ─── Glow ───────────────────────────────── */
+.glow-surface  { box-shadow: 0 8px 48px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3); }
+.glow-teal-sm  { box-shadow: 0 4px 24px rgba(20,184,166,0.25); }
+.glow-teal     { box-shadow: 0 0 0 1px var(--accent-bdr), 0 8px 40px rgba(20,184,166,0.2); }
+
+/* ─── Dot grid ───────────────────────────── */
+.dot-grid {
+  background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 36px 36px;
+}
+
+/* ─── Marquee ────────────────────────────── */
+@keyframes marquee { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+.marquee-track { animation: marquee 36s linear infinite; }
+.marquee-track:hover { animation-play-state:paused; }
+
+/* ─── Float orbs ─────────────────────────── */
+@keyframes float-a { 0%,100%{transform:translate(0,0) scale(1)} 40%{transform:translate(28px,-22px) scale(1.04)} 70%{transform:translate(-18px,14px) scale(0.97)} }
+@keyframes float-b { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-22px,-28px) scale(1.06)} }
+.orb-a { animation: float-a 14s ease-in-out infinite; }
+.orb-b { animation: float-b 18s ease-in-out infinite; }
+
+/* ─── Particle drift ─────────────────────── */
+@keyframes drift { 0%,100%{transform:translateY(0) scale(1);opacity:0.3} 50%{transform:translateY(-30px) scale(1.2);opacity:0.7} }
+
+/* ─── Scan line ──────────────────────────── */
+@keyframes scan { 0%{top:0%;opacity:0.8} 100%{top:100%;opacity:0} }
+.scan-line { position:absolute;left:0;right:0;height:1px;background:linear-gradient(to right,transparent,rgba(20,184,166,0.6),transparent);animation:scan 2s linear infinite;pointer-events:none; }
+
+/* ─── Blink cursor ───────────────────────── */
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+.cursor { animation: blink 1s step-end infinite; }
+
+/* ─── Pulse ring ─────────────────────────── */
+.pulse-ring { position:relative; }
+.pulse-ring::before { content:'';position:absolute;inset:-4px;border-radius:50%;border:1px solid #14b8a6;animation:pulse-ring 2s cubic-bezier(0.22,1,0.36,1) infinite; }
+@keyframes pulse-ring { 0%{transform:scale(1);opacity:0.6} 100%{transform:scale(2);opacity:0} }
+
+/* ─── Check pop ──────────────────────────── */
+@keyframes check-pop { 0%{transform:scale(0) rotate(-10deg);opacity:0} 60%{transform:scale(1.2) rotate(4deg)} 100%{transform:scale(1) rotate(0);opacity:1} }
+.check-pop { animation: check-pop 0.35s cubic-bezier(0.22,1,0.36,1) forwards; }
+
+/* ─── Step connector ─────────────────────── */
+.step-connector { position:absolute;top:20px;left:calc(50% + 20px);width:calc(100% - 40px);height:1px;background:linear-gradient(to right,var(--accent-bdr),rgba(255,255,255,0.04)); }
+
+/* ─── Feature tab ────────────────────────── */
+.feature-tab { transition: background 0.2s, border-color 0.2s, color 0.2s; }
+.feature-tab-active { background: var(--accent-bg) !important; border-color: var(--accent-bdr) !important; color: var(--accent-lt) !important; }
+
+/* ─── Gradient border ─────────────────────── */
+.grad-ring {
+  background: linear-gradient(var(--surface-2), var(--surface-2)) padding-box,
+              linear-gradient(135deg, rgba(20,184,166,0.5), rgba(255,255,255,0.03), rgba(20,184,166,0.15)) border-box;
+  border: 1px solid transparent;
+}
+
+/* ─── Scroll progress bar ────────────────── */
+#scroll-bar { position:fixed;top:0;left:0;height:2px;background:linear-gradient(to right,#14b8a6,#34d399);transform-origin:left;z-index:9999; }
+
+/* ─── Text gradient underline ─────────────── */
+.link-accent { position:relative; }
+.link-accent::after { content:'';position:absolute;bottom:-2px;left:0;width:0;height:1px;background:var(--accent);transition:width 0.3s cubic-bezier(0.22,1,0.36,1); }
+.link-accent:hover::after { width:100%; }

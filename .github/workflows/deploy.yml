@@ -1,0 +1,70 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Next.js app
+        run: npm run build
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          APP_URL: ${{ secrets.APP_URL }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          MONGODB_DB_NAME: ${{ secrets.MONGODB_DB_NAME }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          DATA_ENCRYPTION_KEY: ${{ secrets.DATA_ENCRYPTION_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM: ${{ secrets.RESEND_FROM }}
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+
+      # -------------------------------------------------------
+      # DEPLOY STEP — uncomment whichever platform you use:
+      # -------------------------------------------------------
+
+      # --- Vercel ---
+      # - name: Deploy to Vercel
+      #   run: npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      # --- Railway ---
+      # - name: Deploy to Railway
+      #   run: npx @railway/cli up --service careerorbit
+      #   env:
+      #     RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      # --- Self-hosted / VPS (SSH) ---
+      # - name: Deploy via SSH
+      #   uses: appleboy/ssh-action@v1
+      #   with:
+      #     host: ${{ secrets.SSH_HOST }}
+      #     username: ${{ secrets.SSH_USER }}
+      #     key: ${{ secrets.SSH_PRIVATE_KEY }}
+      #     script: |
+      #       cd /var/www/careerorbit
+      #       git pull origin main
+      #       npm ci
+      #       npm run build
+      #       pm2 restart careerorbit
+
+      - name: Notify success
+        run: echo "Build passed. Uncomment a deploy step above to go live."

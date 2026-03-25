@@ -4,32 +4,82 @@
 
 # CareerOrbit
 
-This contains everything you need to run your app locally.
+A Next.js 15 career platform powered by Google Gemini AI, with MongoDB for persistence and full auth flows.
 
-View your app in AI Studio: https://ai.studio/apps/f50f6f21-cfc1-4453-bb96-6ee74f2b02ab
+---
 
-## Run Locally
+## Tech Stack
 
-**Prerequisites:**  Node.js
+- **Framework** — Next.js 15 (App Router)
+- **Language** — TypeScript
+- **Styling** — Tailwind CSS v4
+- **Database** — MongoDB / Mongoose
+- **AI** — Google Gemini (`@google/genai`)
+- **Auth** — JWT via `jose`, Google OAuth
+- **Email** — Resend
 
+---
+
+## Local Setup
+
+**Prerequisites:** Node.js 20+, a MongoDB connection string
 
 1. Install dependencies:
-   `npm install`
-2. Configure [.env.local](.env.local):
-   - `GEMINI_API_KEY`
-   - `DATABASE_URL`
-   - `SESSION_SECRET`
-3. Generate Prisma client:
-   `npm run db:generate`
-4. Run migrations:
-   `npm run db:migrate`
-5. Seed starter users:
-   `npm run db:seed`
-6. Run the app:
-   `npm run dev`
+   ```bash
+   npm install
+   ```
 
-## Account Flows
+2. Copy the example env file and fill in your values:
+   ```bash
+   cp .env.example .env.local
+   ```
+   Required variables: `GEMINI_API_KEY`, `MONGODB_URI`, `SESSION_SECRET`, `DATA_ENCRYPTION_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
 
-- Students can now self-register from the landing page (`/`) and are automatically signed in.
-- Existing users can sign in from `/login`.
-- Seeded test users still work after running `npm run db:seed`.
+3. Seed the database:
+   ```bash
+   npm run db:seed
+   ```
+
+4. Start the dev server:
+   ```bash
+   npm run dev
+   ```
+
+---
+
+## Scripts
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | Start dev server |
+| `npm run build` | Production build |
+| `npm run lint` | Run ESLint |
+| `npm run db:seed` | Seed MongoDB with starter data |
+
+---
+
+## Branching Strategy
+
+```
+main        ← production (protected, requires PR + review)
+develop     ← integration branch
+feature/*   ← new features
+fix/*       ← bug fixes
+```
+
+Always branch off `develop`, open a PR back to `develop`, then `develop` → `main` for releases.
+
+---
+
+## Contributing
+
+1. Branch off `develop`: `git checkout -b feature/your-feature develop`
+2. Make your changes
+3. Open a PR to `develop` — the CI pipeline will run automatically
+4. Get a review from a codeowner before merging
+
+---
+
+## Environment Variables
+
+See [.env.example](.env.example) for all required and optional variables. **Never commit real secrets.**
