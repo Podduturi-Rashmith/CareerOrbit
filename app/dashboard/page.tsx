@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'motion/react';
@@ -26,7 +26,9 @@ function StatusPill({ status }: { status: string }) {
 export default function DashboardPage() {
   return (
     <DashboardLayout>
-      <DashboardContent />
+      <Suspense>
+        <DashboardContent />
+      </Suspense>
     </DashboardLayout>
   );
 }

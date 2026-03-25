@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { Suspense, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { AuthProvider } from '@/hooks/use-auth';
 import Link from 'next/link';
@@ -165,7 +165,9 @@ function LoginPageContent() {
 export default function LoginPage() {
   return (
     <AuthProvider>
-      <LoginPageContent />
+      <Suspense>
+        <LoginPageContent />
+      </Suspense>
     </AuthProvider>
   );
 }
