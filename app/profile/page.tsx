@@ -2,8 +2,7 @@
 
 import React from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
-import { useAuth } from '@/hooks/use-auth';
-import { 
+import {
   User, 
   Mail, 
   GraduationCap, 
@@ -20,7 +19,6 @@ export default function ProfilePage() {
 }
 
 function ProfileContent() {
-  const { user } = useAuth();
   const [profile, setProfile] = React.useState<{
     id: string;
     name: string;
@@ -32,7 +30,7 @@ function ProfileContent() {
   } | null>(null);
   const [loading, setLoading] = React.useState(true);
   const isStudent = profile?.role === 'student';
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = profile?.role === 'admin';
 
   React.useEffect(() => {
     const loadProfile = async () => {
@@ -67,7 +65,7 @@ function ProfileContent() {
             <div className="w-24 h-24 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 mx-auto mb-4">
               <User className="w-12 h-12" />
             </div>
-            <h2 className="text-xl font-bold text-slate-900">{profile?.name || user?.name || 'Student'}</h2>
+            <h2 className="text-xl font-bold text-slate-900">{profile?.name || 'Student'}</h2>
 
             <div className="mt-6 p-3 bg-slate-50 rounded-xl border border-slate-100">
               <p className="text-xs text-slate-500 italic">
@@ -95,14 +93,14 @@ function ProfileContent() {
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Full Name</p>
                 <div className="flex items-center gap-2 text-slate-900 font-medium">
                   <User className="w-4 h-4 text-slate-400" />
-                  {profile?.name || user?.name || 'N/A'}
+                  {profile?.name || 'N/A'}
                 </div>
               </div>
               <div className="space-y-1">
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Email Address</p>
                 <div className="flex items-center gap-2 text-slate-900 font-medium">
                   <Mail className="w-4 h-4 text-slate-400" />
-                  {profile?.email || user?.email || 'N/A'}
+                  {profile?.email || 'N/A'}
                 </div>
               </div>
               {!isAdmin && (
