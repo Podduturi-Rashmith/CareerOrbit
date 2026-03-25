@@ -69,7 +69,7 @@ function LoginPageContent() {
             <Briefcase className="w-8 h-8" />
           </div>
           <h1 className="text-3xl font-display font-bold text-slate-900 tracking-tight">CareerOrbit</h1>
-          <p className="text-slate-500 mt-2">Sign in to track your applications</p>
+          <p className="text-slate-500 mt-2">Your career journey starts here</p>
         </div>
 
         <div className="space-y-4">
