@@ -37,7 +37,7 @@ const Sidebar = () => {
     loadNewUserCount().catch(() => undefined);
   }, [user]);
 
-  const studentLinks = [
+  const studentLinks: { name: string; href: string; icon: React.ElementType; badge?: number }[] = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Applications', href: '/applications', icon: Briefcase },
     { name: 'Calendar', href: '/calendar', icon: Calendar },

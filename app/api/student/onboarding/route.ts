@@ -81,16 +81,16 @@ export async function POST(request: Request) {
 
   const workExperiences = Array.isArray(body.workExperiences)
     ? body.workExperiences
-        .map((item) => ({
+        .map((item: Record<string, unknown>) => ({
           companyName: String(item.companyName || '').trim(),
           location: String(item.location || '').trim(),
-          startDate: toDateOrNull(item.startDate),
-          endDate: toDateOrNull(item.endDate),
+          startDate: toDateOrNull(item.startDate as string | null | undefined),
+          endDate: toDateOrNull(item.endDate as string | null | undefined),
           points: Array.isArray(item.points)
             ? item.points.map((p: string) => String(p).trim()).filter(Boolean)
             : [],
         }))
-        .filter((item) => item.companyName && item.location && item.startDate && item.points.length)
+        .filter((item: { companyName: string; location: string; startDate: Date | null; points: string[] }) => item.companyName && item.location && item.startDate && item.points.length)
     : [];
 
   const onboardingPayload = {
