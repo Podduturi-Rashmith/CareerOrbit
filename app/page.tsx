@@ -4,6 +4,7 @@ import React, {
   useState, useEffect, useCallback, useRef,
 } from 'react';
 import Link from 'next/link';
+import { useUser } from '@clerk/nextjs';
 import {
   motion, AnimatePresence,
   useMotionValue, useSpring, useScroll, useTransform, useInView,
@@ -604,6 +605,9 @@ function FaqItem({ q, a, idx }: { q:string; a:string; idx:number }) {
    MAIN PAGE
 ════════════════════════════════════════════ */
 export default function LandingPage() {
+  const { user, isLoaded, isSignedIn } = useUser();
+  const role = user?.publicMetadata?.role as string | undefined;
+  const dashboardHref = (role === 'admin' || role === 'sub-admin') ? '/admin' : '/dashboard';
 
   const STEPS = [
     {Icon:FileText,        n:'01',title:'Share Profile',      desc:'One-time setup — your resume, target roles, visa status, preferences.'},
@@ -632,8 +636,19 @@ export default function LandingPage() {
               ))}
             </div>
             <div className="flex items-center gap-2">
-              <Link href="/sign-in" className="btn-ghost px-4 py-1.5 text-[13px]">Sign In</Link>
-              <Link href="/sign-up" className="btn-accent px-4 py-1.5 text-[13px]">Get Started</Link>
+              {isLoaded && isSignedIn ? (
+                <>
+                  <div className="w-7 h-7 rounded-full bg-teal-500 flex items-center justify-center text-[11px] font-black text-[#042f2e]">
+                    {(user.firstName?.[0] ?? user.phoneNumbers?.[0]?.phoneNumber?.[3] ?? '?').toUpperCase()}
+                  </div>
+                  <Link href={dashboardHref} className="btn-accent px-4 py-1.5 text-[13px]">Dashboard →</Link>
+                </>
+              ) : (
+                <>
+                  <Link href="/sign-in" className="btn-ghost px-4 py-1.5 text-[13px]">Sign In</Link>
+                  <Link href="/sign-up" className="btn-accent px-4 py-1.5 text-[13px]">Get Started</Link>
+                </>
+              )}
             </div>
           </nav>
         </div>
@@ -912,14 +927,23 @@ export default function LandingPage() {
                     <p className="font-bold text-lg" style={{color:'var(--text-1)'}}>Student Account</p>
                     <p className="text-sm mt-1" style={{color:'var(--text-3)'}}>Instant access to your dashboard. Free to start.</p>
                   </div>
-                  <Link href="/sign-up" className="btn-accent inline-flex items-center gap-2.5 px-8 py-3 text-[15px] w-full justify-center">
-                    Create Free Account
-                    <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-teal-600/40"><ArrowRight size={14} weight="bold"/></span>
-                  </Link>
-                  <p className="text-xs" style={{color:'var(--text-3)'}}>
-                    Already have an account?{' '}
-                    <Link href="/sign-in" className="link-accent" style={{color:'var(--accent)'}}>Sign in</Link>
-                  </p>
+                  {isLoaded && isSignedIn ? (
+                    <Link href={dashboardHref} className="btn-accent inline-flex items-center gap-2.5 px-8 py-3 text-[15px] w-full justify-center">
+                      Go to Dashboard
+                      <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-teal-600/40"><ArrowRight size={14} weight="bold"/></span>
+                    </Link>
+                  ) : (
+                    <>
+                      <Link href="/sign-up" className="btn-accent inline-flex items-center gap-2.5 px-8 py-3 text-[15px] w-full justify-center">
+                        Create Free Account
+                        <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-teal-600/40"><ArrowRight size={14} weight="bold"/></span>
+                      </Link>
+                      <p className="text-xs" style={{color:'var(--text-3)'}}>
+                        Already have an account?{' '}
+                        <Link href="/sign-in" className="link-accent" style={{color:'var(--accent)'}}>Sign in</Link>
+                      </p>
+                    </>
+                  )}
                   <div className="flex items-center gap-2 text-xs" style={{color:'var(--text-3)'}}>
                     <ShieldCheck size={14} weight="duotone" className="text-teal-600 shrink-0"/>
                     Encrypted sessions. Your data is never sold or shared.
@@ -954,11 +978,20 @@ export default function LandingPage() {
               Join the students who let CareerOrbit handle the grind — so they can focus on preparing and performing.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-4">
-              <MagBtn href="/sign-up" className="btn-accent inline-flex items-center gap-2.5 px-9 py-4 text-base">
-                Create Free Account
-                <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-teal-600/40"><ArrowRight size={14} weight="bold"/></span>
-              </MagBtn>
-              <MagBtn href="/sign-in" className="btn-ghost inline-flex items-center gap-2 px-9 py-4 text-base">Sign In</MagBtn>
+              {isLoaded && isSignedIn ? (
+                <MagBtn href={dashboardHref} className="btn-accent inline-flex items-center gap-2.5 px-9 py-4 text-base">
+                  Go to Dashboard
+                  <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-teal-600/40"><ArrowRight size={14} weight="bold"/></span>
+                </MagBtn>
+              ) : (
+                <>
+                  <MagBtn href="/sign-up" className="btn-accent inline-flex items-center gap-2.5 px-9 py-4 text-base">
+                    Create Free Account
+                    <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-teal-600/40"><ArrowRight size={14} weight="bold"/></span>
+                  </MagBtn>
+                  <MagBtn href="/sign-in" className="btn-ghost inline-flex items-center gap-2 px-9 py-4 text-base">Sign In</MagBtn>
+                </>
+              )}
             </div>
           </FadeIn>
         </section>

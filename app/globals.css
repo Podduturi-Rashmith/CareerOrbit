@@ -162,6 +162,12 @@ html { scroll-behavior: smooth; }
 /* ─── Scroll progress bar ────────────────── */
 #scroll-bar { position:fixed;top:0;left:0;height:2px;background:linear-gradient(to right,#14b8a6,#34d399);transform-origin:left;z-index:9999; }
 
+/* ─── Clerk auth form overrides ──────────── */
+.cl-formFieldInput::placeholder { color: #94a3b8 !important; opacity: 1 !important; }
+.cl-phoneInputBox input::placeholder { color: #94a3b8 !important; opacity: 1 !important; }
+.cl-selectButton { color: #475569 !important; }
+.cl-phoneNumberInput { color: #0f172a !important; }
+
 /* ─── Text gradient underline ─────────────── */
 .link-accent { position:relative; }
 .link-accent::after { content:'';position:absolute;bottom:-2px;left:0;width:0;height:1px;background:var(--accent);transition:width 0.3s cubic-bezier(0.22,1,0.36,1); }

@@ -2,7 +2,8 @@
 
 import React, { Suspense } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { useUser } from '@clerk/nextjs';
 import { motion } from 'motion/react';
 import { ArrowUpRight, BriefcaseBusiness, CalendarClock, CircleDotDashed, ExternalLink, Trophy } from 'lucide-react';
 import DashboardLayout from '@/components/DashboardLayout';
@@ -34,12 +35,25 @@ export default function DashboardPage() {
 
 function DashboardContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const { user, isLoaded } = useUser();
   const [applications, setApplications] = React.useState<StudentApplicationDto[]>([]);
   const [loading, setLoading] = React.useState(true);
   const isFirstWelcome = searchParams.get('welcome') === '1';
   const [onboardingStatus, setOnboardingStatus] = React.useState<'loading' | 'required' | 'complete'>('loading');
 
+  const role = isLoaded ? (user?.publicMetadata?.role as string | undefined) : undefined;
+  const isAdmin = role === 'admin' || role === 'sub-admin';
+
+  // Redirect admins — must know the role first
   React.useEffect(() => {
+    if (!isLoaded) return;
+    if (isAdmin) router.replace('/admin');
+  }, [isLoaded, isAdmin, router]);
+
+  // Only fetch applications once we know the user is a student
+  React.useEffect(() => {
+    if (!isLoaded || isAdmin) return;
     const loadApplications = async () => {
       try {
         const response = await fetch('/api/student/applications', { credentials: 'include' });
@@ -52,14 +66,12 @@ function DashboardContent() {
         setLoading(false);
       }
     };
+    loadApplications().catch(() => { setApplications([]); setLoading(false); });
+  }, [isLoaded, isAdmin]);
 
-    loadApplications().catch(() => {
-      setApplications([]);
-      setLoading(false);
-    });
-  }, []);
-
+  // Only check onboarding once we know the user is a student
   React.useEffect(() => {
+    if (!isLoaded || isAdmin) return;
     const loadOnboarding = async () => {
       try {
         const response = await fetch('/api/student/onboarding', { credentials: 'include' });
@@ -70,16 +82,18 @@ function DashboardContent() {
         setOnboardingStatus('required');
       }
     };
+    loadOnboarding().catch(() => setOnboardingStatus('required'));
+  }, [isLoaded, isAdmin]);
 
-    loadOnboarding().catch(() => {
-      setOnboardingStatus('required');
-    });
-  }, []);
+  // Still figuring out who the user is — show nothing yet
+  if (!isLoaded || isAdmin) {
+    return null;
+  }
 
   if (onboardingStatus === 'loading') {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12 text-slate-600">
-        Loading your registration form...
+        Loading...
       </div>
     );
   }
