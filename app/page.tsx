@@ -210,10 +210,12 @@ const DOTS = Array.from({ length: 18 }, (_, i) => ({
 }));
 
 function Particles() {
-  const dots = DOTS;
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {dots.map(d => (
+      {DOTS.map(d => (
         <motion.div key={d.id} className="absolute rounded-full"
           style={{ left: `${d.x}%`, top: `${d.y}%`, width: d.r * 2, height: d.r * 2, background: '#14b8a6' }}
           animate={{ y: [-20, 20, -20], opacity: [0.15, 0.5, 0.15] }}
@@ -602,25 +604,6 @@ function FaqItem({ q, a, idx }: { q:string; a:string; idx:number }) {
    MAIN PAGE
 ════════════════════════════════════════════ */
 export default function LandingPage() {
-  const [name,setName]         = useState('');
-  const [email,setEmail]       = useState('');
-  const [password,setPassword] = useState('');
-  const [sub,setSub]           = useState(false);
-  const [err,setErr]           = useState('');
-  const [ok,setOk]             = useState('');
-  const [verLink,setVerLink]   = useState('');
-
-  const handleSignup = async (e:{preventDefault():void}) => {
-    e.preventDefault(); setErr(''); setOk(''); setVerLink(''); setSub(true);
-    try {
-      const r = await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({name,email,password})});
-      if (!r.ok) { const b=await r.json().catch(()=>({error:'Failed.'})); throw new Error(b.error||'Failed.'); }
-      const b=await r.json();
-      setOk('Account created! Verify your email to sign in.');
-      if (b.verificationLink) setVerLink(b.verificationLink);
-    } catch(e) { setErr(e instanceof Error?e.message:'Failed.'); }
-    finally { setSub(false); }
-  };
 
   const STEPS = [
     {Icon:FileText,        n:'01',title:'Share Profile',      desc:'One-time setup — your resume, target roles, visa status, preferences.'},
@@ -649,8 +632,8 @@ export default function LandingPage() {
               ))}
             </div>
             <div className="flex items-center gap-2">
-              <Link href="/login" className="text-[13px] hover:text-white transition-colors px-2 py-1" style={{color:'var(--text-2)'}}>Sign In</Link>
-              <a href="#register" className="btn-accent px-4 py-1.5 text-[13px]">Get Started</a>
+              <Link href="/sign-in" className="btn-ghost px-4 py-1.5 text-[13px]">Sign In</Link>
+              <Link href="/sign-up" className="btn-accent px-4 py-1.5 text-[13px]">Get Started</Link>
             </div>
           </nav>
         </div>
@@ -699,7 +682,7 @@ export default function LandingPage() {
                 </motion.div>
 
                 <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} transition={{delay:1,ease:EASE}} className="flex flex-wrap gap-3">
-                  <MagBtn href="#register" className="btn-accent inline-flex items-center gap-2.5 px-6 py-3 text-[15px]">
+                  <MagBtn href="/sign-up" className="btn-accent inline-flex items-center gap-2.5 px-6 py-3 text-[15px]">
                     Start Free
                     <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-teal-600/40">
                       <ArrowRight size={14} weight="bold"/>
@@ -920,57 +903,24 @@ export default function LandingPage() {
             </FadeIn>
             <FadeIn delay={0.1}>
               <div className="doppelrand rounded-3xl">
-                <div className="doppelrand-inner">
-                  <div className="flex items-center gap-3 mb-7">
-                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
-                      style={{background:'var(--accent-bg)',border:'1px solid var(--accent-bdr)'}}>
-                      <UserPlus size={20} weight="duotone" className="text-teal-400"/>
-                    </div>
-                    <div>
-                      <p className="font-bold" style={{color:'var(--text-1)'}}>Student Account</p>
-                      <p className="text-sm" style={{color:'var(--text-3)'}}>Instant access to your dashboard</p>
-                    </div>
+                <div className="doppelrand-inner flex flex-col items-center text-center gap-6 py-10">
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                    style={{background:'var(--accent-bg)',border:'1px solid var(--accent-bdr)'}}>
+                    <UserPlus size={26} weight="duotone" className="text-teal-400"/>
                   </div>
-                  <a href="/api/auth/google"
-                    className="w-full flex items-center justify-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all hover:bg-white/5 mb-5"
-                    style={{background:'rgba(255,255,255,0.03)',border:'1px solid var(--border-md)',color:'var(--text-2)'}}>
-                    <svg className="w-4 h-4" viewBox="0 0 24 24">
-                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                    </svg>
-                    Continue with Google
-                  </a>
-                  <div className="flex items-center gap-3 text-xs mb-5" style={{color:'var(--text-3)'}}>
-                    <span className="flex-1 h-px" style={{background:'var(--border)'}}/> or sign up with email
-                    <span className="flex-1 h-px" style={{background:'var(--border)'}}/>
+                  <div>
+                    <p className="font-bold text-lg" style={{color:'var(--text-1)'}}>Student Account</p>
+                    <p className="text-sm mt-1" style={{color:'var(--text-3)'}}>Instant access to your dashboard. Free to start.</p>
                   </div>
-                  <form onSubmit={handleSignup} className="space-y-4">
-                    {err && <div className="rounded-xl px-4 py-2.5 text-sm" style={{background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',color:'#fca5a5'}}>{err}</div>}
-                    {ok  && <div className="rounded-xl px-4 py-2.5 text-sm flex items-center gap-2" style={{background:'var(--accent-bg)',border:'1px solid var(--accent-bdr)',color:'#5eead4'}}><CheckCircle size={16} weight="fill" className="shrink-0"/>{ok}</div>}
-                    {verLink && <div className="rounded-xl px-4 py-2.5 text-xs break-all" style={{background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.2)',color:'#fcd34d'}}>Dev: {verLink}</div>}
-                    {[
-                      {l:'Full Name',t:'text',    v:name,    s:setName,    p:'Your full name'},
-                      {l:'Email',    t:'email',   v:email,   s:setEmail,   p:'you@university.edu'},
-                      {l:'Password', t:'password',v:password,s:setPassword,p:'Min. 8 characters',min:8},
-                    ].map(f=>(
-                      <div key={f.l}>
-                        <label className="block text-[11px] font-bold uppercase tracking-widest mb-1.5" style={{color:'var(--text-3)'}}>{f.l}</label>
-                        <input type={f.t} value={f.v} onChange={e=>f.s(e.target.value)} required minLength={f.min} placeholder={f.p}
-                          className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all"
-                          style={{background:'var(--base)',border:'1px solid var(--border-md)',color:'var(--text-1)'}}
-                          onFocus={e=>e.currentTarget.style.borderColor='var(--accent-bdr)'}
-                          onBlur={e=>e.currentTarget.style.borderColor='var(--border-md)'}/>
-                      </div>
-                    ))}
-                    <button type="submit" disabled={sub}
-                      className="btn-accent w-full py-3 text-sm flex items-center justify-center gap-2.5 mt-1 disabled:opacity-50">
-                      {sub?'Creating account…':'Create Free Account'}
-                      {!sub && <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-teal-600/40"><ArrowRight size={14} weight="bold"/></span>}
-                    </button>
-                  </form>
-                  <div className="mt-5 flex items-center gap-2 text-xs" style={{color:'var(--text-3)'}}>
+                  <Link href="/sign-up" className="btn-accent inline-flex items-center gap-2.5 px-8 py-3 text-[15px] w-full justify-center">
+                    Create Free Account
+                    <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-teal-600/40"><ArrowRight size={14} weight="bold"/></span>
+                  </Link>
+                  <p className="text-xs" style={{color:'var(--text-3)'}}>
+                    Already have an account?{' '}
+                    <Link href="/sign-in" className="link-accent" style={{color:'var(--accent)'}}>Sign in</Link>
+                  </p>
+                  <div className="flex items-center gap-2 text-xs" style={{color:'var(--text-3)'}}>
                     <ShieldCheck size={14} weight="duotone" className="text-teal-600 shrink-0"/>
                     Encrypted sessions. Your data is never sold or shared.
                   </div>
@@ -1004,11 +954,11 @@ export default function LandingPage() {
               Join the students who let CareerOrbit handle the grind — so they can focus on preparing and performing.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-4">
-              <MagBtn href="#register" className="btn-accent inline-flex items-center gap-2.5 px-9 py-4 text-base">
+              <MagBtn href="/sign-up" className="btn-accent inline-flex items-center gap-2.5 px-9 py-4 text-base">
                 Create Free Account
                 <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-teal-600/40"><ArrowRight size={14} weight="bold"/></span>
               </MagBtn>
-              <MagBtn href="/login" className="btn-ghost inline-flex items-center gap-2 px-9 py-4 text-base">Sign In</MagBtn>
+              <MagBtn href="/sign-in" className="btn-ghost inline-flex items-center gap-2 px-9 py-4 text-base">Sign In</MagBtn>
             </div>
           </FadeIn>
         </section>
@@ -1027,14 +977,14 @@ export default function LandingPage() {
               <div className="flex gap-10 text-sm">
                 {[
                   {title:'Platform',links:[{l:'How It Works',h:'#how-it-works'},{l:'Features',h:'#features'},{l:'FAQ',h:'#faq'}]},
-                  {title:'Account', links:[{l:'Sign Up',h:'#register'},{l:'Sign In',h:'/login',ext:true}]},
+                  {title:'Account', links:[{l:'Sign Up',h:'/sign-up'},{l:'Sign In',h:'/sign-in'}]},
                 ].map(col=>(
                   <div key={col.title}>
                     <p className="font-semibold mb-3" style={{color:'var(--text-1)'}}>{col.title}</p>
                     <ul className="space-y-2">
                       {col.links.map(lk=>(
                         <li key={lk.l}>
-                          {lk.ext
+                          {lk.h.startsWith('/')
                             ? <Link href={lk.h} className="link-accent hover:text-white transition-colors" style={{color:'var(--text-3)'}}>{lk.l}</Link>
                             : <a href={lk.h} className="link-accent hover:text-white transition-colors" style={{color:'var(--text-3)'}}>{lk.l}</a>}
                         </li>

@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Bell, Search, User as UserIcon } from 'lucide-react';
+import { Show, UserButton, SignInButton } from '@clerk/nextjs';
+import { Bell, Search } from 'lucide-react';
 
 const Topbar = () => {
   return (
@@ -23,11 +24,12 @@ const Topbar = () => {
 
         <div className="h-8 w-px bg-slate-200 mx-2"></div>
 
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700">
-            <UserIcon className="w-6 h-6" />
-          </div>
-        </div>
+        <Show when="signed-in">
+          <UserButton />
+        </Show>
+        <Show when="signed-out">
+          <SignInButton mode="modal" />
+        </Show>
       </div>
     </header>
   );
