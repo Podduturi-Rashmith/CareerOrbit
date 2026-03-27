@@ -1,3 +1,4 @@
+import { ClerkProvider } from '@clerk/nextjs'
 import { DM_Sans, Space_Grotesk } from 'next/font/google'
 import './globals.css'
 
@@ -22,7 +23,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${dmSans.variable} ${spaceGrotesk.variable}`}>
       <body className="font-sans antialiased" suppressHydrationWarning>
-        {children}
+        <ClerkProvider afterSignOutUrl="/sign-in">
+          {children}
+        </ClerkProvider>
       </body>
     </html>
   )
