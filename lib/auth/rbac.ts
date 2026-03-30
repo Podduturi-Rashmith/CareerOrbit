@@ -10,8 +10,14 @@ export type AppRole = 'student' | 'sub-admin' | 'admin'
 export async function getCurrentRole(): Promise<AppRole | null> {
   const { sessionClaims } = await auth()
   if (!sessionClaims) return null
-  const meta = sessionClaims.metadata as { role?: AppRole } | undefined
-  return meta?.role ?? 'student'
+  const sessionAny = sessionClaims as any
+  const rawRole = sessionAny?.metadata?.role
+    ?? sessionAny?.publicMetadata?.role
+    ?? sessionAny?.claims?.metadata?.role
+    ?? 'student'
+  const role = typeof rawRole === 'string' ? rawRole.toLowerCase() : rawRole
+
+  return role as AppRole
 }
 
 /**
@@ -31,7 +37,11 @@ export async function requireAdminRole(): Promise<NextResponse | null> {
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  const role = (sessionClaims?.metadata as { role?: string } | undefined)?.role
+  const sessionAny = sessionClaims as any
+  const rawRole = sessionAny?.metadata?.role
+    ?? sessionAny?.publicMetadata?.role
+    ?? sessionAny?.claims?.metadata?.role
+  const role = typeof rawRole === 'string' ? rawRole.toLowerCase() : rawRole
   if (role !== 'admin' && role !== 'sub-admin') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
