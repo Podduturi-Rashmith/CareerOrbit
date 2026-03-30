@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
+import RoleGate from '@/components/RoleGate';
 
 type NewUserSubmission = {
   id: string;
@@ -61,8 +62,9 @@ export default function AdminNewUsersPage() {
   }, []);
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <RoleGate expectedRole="admin">
+      <DashboardLayout>
+        <div className="space-y-6">
         <section className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8">
           <div className="flex items-center justify-between">
             <div>
@@ -156,7 +158,8 @@ export default function AdminNewUsersPage() {
             ))}
           </div>
         </section>
-      </div>
-    </DashboardLayout>
+        </div>
+      </DashboardLayout>
+    </RoleGate>
   );
 }

@@ -3,6 +3,7 @@
 import React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
+import RoleGate from '@/components/RoleGate';
 import { 
   ArrowLeft, 
   Building2, 
@@ -69,31 +70,36 @@ export default function ApplicationDetailsPage() {
 
   if (loading) {
     return (
-      <DashboardLayout>
-        <div className="text-center py-20 text-slate-500">Loading application...</div>
-      </DashboardLayout>
+      <RoleGate expectedRole="student">
+        <DashboardLayout>
+          <div className="text-center py-20 text-slate-500">Loading application...</div>
+        </DashboardLayout>
+      </RoleGate>
     );
   }
 
   if (!app) {
     return (
-      <DashboardLayout>
-        <div className="text-center py-20">
-          <h2 className="text-xl font-bold text-slate-900">Application not found</h2>
-          <button 
-            onClick={() => router.back()}
-            className="mt-4 text-indigo-600 font-medium hover:underline"
-          >
-            Go back
-          </button>
-        </div>
-      </DashboardLayout>
+      <RoleGate expectedRole="student">
+        <DashboardLayout>
+          <div className="text-center py-20">
+            <h2 className="text-xl font-bold text-slate-900">Application not found</h2>
+            <button 
+              onClick={() => router.back()}
+              className="mt-4 text-indigo-600 font-medium hover:underline"
+            >
+              Go back
+            </button>
+          </div>
+        </DashboardLayout>
+      </RoleGate>
     );
   }
 
   return (
-    <DashboardLayout>
-      <div className="max-w-4xl mx-auto space-y-8">
+    <RoleGate expectedRole="student">
+      <DashboardLayout>
+        <div className="max-w-4xl mx-auto space-y-8">
         <button 
           onClick={() => router.back()}
           className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
@@ -235,7 +241,8 @@ export default function ApplicationDetailsPage() {
             </section>
           </div>
         </div>
-      </div>
-    </DashboardLayout>
+        </div>
+      </DashboardLayout>
+    </RoleGate>
   );
 }
