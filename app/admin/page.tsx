@@ -23,6 +23,7 @@ import type { JobRoleCategory, StudentCandidate } from '@/lib/jobs/types';
 import { roleLabel } from '@/lib/jobs/role-utils';
 import type { Student } from '@/lib/mock-data';
 import RoleGate from '@/components/RoleGate';
+import AdminDashboardV2 from '@/components/admin/AdminDashboard';
 
 type ActiveTab = 'students' | 'applications' | 'bot-lab';
 type DashboardRoleFilter =
@@ -72,7 +73,7 @@ const statusTone: Record<string, string> = {
   Offer: 'bg-emerald-100 text-emerald-800 border-emerald-200',
 };
 
-export default function AdminDashboard() {
+function LegacyAdminDashboard() {
   const [students, setStudents] = useState<Student[]>(MOCK_STUDENTS);
   const [activeTab, setActiveTab] = useState<ActiveTab>('students');
   const [searchTerm, setSearchTerm] = useState('');
@@ -798,4 +799,8 @@ export default function AdminDashboard() {
       </DashboardLayout>
     </RoleGate>
   );
+}
+
+export default function AdminPage() {
+  return <AdminDashboardV2 />;
 }
