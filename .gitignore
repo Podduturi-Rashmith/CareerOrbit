@@ -5,3 +5,6 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# clerk configuration (can include secrets)
+/.clerk/

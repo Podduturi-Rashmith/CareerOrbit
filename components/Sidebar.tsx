@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Briefcase,
-  Calendar,
+  FileText,
   User,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -14,12 +14,21 @@ import { cn } from '@/lib/utils';
 const Sidebar = () => {
   const pathname = usePathname();
 
-  const links = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Applications', href: '/applications', icon: Briefcase },
-    { name: 'Calendar', href: '/calendar', icon: Calendar },
-    { name: 'Profile', href: '/profile', icon: User },
-  ];
+  const isAdminRoute = pathname.startsWith('/admin');
+
+  const links = isAdminRoute
+    ? [
+        { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+        { name: 'Jobs', href: '/admin/jobs', icon: Briefcase },
+        { name: 'Applications', href: '/admin/applications', icon: Briefcase },
+        { name: 'Students', href: '/admin/students', icon: User },
+        { name: 'New Users', href: '/admin/new-users', icon: FileText },
+      ]
+    : [
+        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+        { name: 'Applications', href: '/applications', icon: Briefcase },
+        { name: 'Profile', href: '/profile', icon: User },
+      ];
 
   return (
     <aside className="w-64 bg-white border-r border-slate-200 flex flex-col h-screen sticky top-0">
