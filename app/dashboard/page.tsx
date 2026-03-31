@@ -43,16 +43,12 @@ function DashboardContent() {
   const [onboardingStatus, setOnboardingStatus] = React.useState<'loading' | 'required' | 'complete'>('loading');
 
   const role = isLoaded ? (user?.publicMetadata?.role as string | undefined) : undefined;
-  const roles = isLoaded ? ((user?.publicMetadata as any)?.roles as unknown) : undefined;
-  const normalizedRoles = Array.isArray(roles) ? roles.map((r) => (typeof r === 'string' ? r.toLowerCase() : '')).filter(Boolean) : [];
-  const isAdmin = (role === 'admin' || role === 'sub-admin') || normalizedRoles.includes('admin') || normalizedRoles.includes('sub-admin');
-  const isStudent = role === 'student' || normalizedRoles.includes('student') || (!isAdmin && normalizedRoles.length === 0 && !role);
+  const isAdmin = role === 'admin' || role === 'sub-admin';
 
   // Redirect admins — must know the role first
   React.useEffect(() => {
     if (!isLoaded) return;
-    // If the user is dual-role (admin + student), keep them in student dashboard when they choose it.
-    if (isAdmin && !isStudent) router.replace('/admin');
+    if (isAdmin) router.replace('/admin');
   }, [isLoaded, isAdmin, router]);
 
   // Only fetch applications once we know the user is a student
@@ -90,7 +86,7 @@ function DashboardContent() {
   }, [isLoaded, isAdmin]);
 
   // Still figuring out who the user is — show nothing yet
-  if (!isLoaded || (isAdmin && !isStudent)) {
+  if (!isLoaded || isAdmin) {
     return null;
   }
 

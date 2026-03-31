@@ -2,7 +2,6 @@
 
 import React from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
-import RoleGate from '@/components/RoleGate';
 import {
   User, 
   Mail, 
@@ -13,11 +12,9 @@ import {
 
 export default function ProfilePage() {
   return (
-    <RoleGate expectedRole="student">
-      <DashboardLayout>
-        <ProfileContent />
-      </DashboardLayout>
-    </RoleGate>
+    <DashboardLayout>
+      <ProfileContent />
+    </DashboardLayout>
   );
 }
 

@@ -22,7 +22,6 @@ import {
 import type { JobRoleCategory, StudentCandidate } from '@/lib/jobs/types';
 import { roleLabel } from '@/lib/jobs/role-utils';
 import type { Student } from '@/lib/mock-data';
-import RoleGate from '@/components/RoleGate';
 
 type ActiveTab = 'students' | 'applications' | 'bot-lab';
 type DashboardRoleFilter =
@@ -306,9 +305,8 @@ export default function AdminDashboard() {
   }, [selectedJobId, activeTab]);
 
   return (
-    <RoleGate expectedRole="admin">
-      <DashboardLayout>
-        <div className="space-y-8">
+    <DashboardLayout>
+      <div className="space-y-8">
         <section className="rounded-3xl border border-slate-200 bg-slate-900 text-white p-8 md:p-10 relative overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(20,184,166,0.2),transparent_38%),radial-gradient(circle_at_85%_30%,rgba(14,165,233,0.2),transparent_30%)]" />
           <div className="relative flex flex-col lg:flex-row justify-between gap-8">
@@ -795,7 +793,6 @@ export default function AdminDashboard() {
           </div>
         )}
       </AnimatePresence>
-      </DashboardLayout>
-    </RoleGate>
+    </DashboardLayout>
   );
 }

@@ -607,12 +607,7 @@ function FaqItem({ q, a, idx }: { q:string; a:string; idx:number }) {
 export default function LandingPage() {
   const { user, isLoaded, isSignedIn } = useUser();
   const role = user?.publicMetadata?.role as string | undefined;
-  const roles = (user?.publicMetadata as any)?.roles as unknown;
-  const normalizedRoles = Array.isArray(roles) ? roles.map((r) => (typeof r === 'string' ? r.toLowerCase() : '')).filter(Boolean) : [];
-  const isAdmin = role === 'admin' || role === 'sub-admin' || normalizedRoles.includes('admin') || normalizedRoles.includes('sub-admin');
-  const isStudent = role === 'student' || normalizedRoles.includes('student') || (!isAdmin && !role && normalizedRoles.length === 0);
-  // If dual-role, prefer student dashboard from the home "Dashboard" button (admin still accessible via /admin).
-  const dashboardHref = isAdmin && !isStudent ? '/admin' : '/dashboard';
+  const dashboardHref = (role === 'admin' || role === 'sub-admin') ? '/admin' : '/dashboard';
 
   const STEPS = [
     {Icon:FileText,        n:'01',title:'Share Profile',      desc:'One-time setup — your resume, target roles, visa status, preferences.'},
@@ -650,8 +645,8 @@ export default function LandingPage() {
                 </>
               ) : (
                 <>
-                  <Link href="/sign-in?redirect_url=/admin" className="btn-ghost px-4 py-1.5 text-[13px]">Admin Login</Link>
-                  <Link href="/sign-in?redirect_url=/dashboard" className="btn-accent px-4 py-1.5 text-[13px]">Student Login</Link>
+                  <Link href="/sign-in" className="btn-ghost px-4 py-1.5 text-[13px]">Sign In</Link>
+                  <Link href="/sign-up" className="btn-accent px-4 py-1.5 text-[13px]">Get Started</Link>
                 </>
               )}
             </div>
