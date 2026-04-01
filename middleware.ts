@@ -53,7 +53,7 @@ export default clerkMiddleware(async (auth, req) => {
 
   // Admin users are restricted to admin area only.
   if (isStudentRoute && isAdmin) {
-    return NextResponse.redirect(new URL('/admin', req.url))
+    return NextResponse.redirect(new URL('/admin/jobs', req.url))
   }
 
   // Student users are restricted to student area only.

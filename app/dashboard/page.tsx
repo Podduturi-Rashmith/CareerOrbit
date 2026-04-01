@@ -52,8 +52,8 @@ function DashboardContent() {
   React.useEffect(() => {
     if (!isLoaded) return;
     // If the user is dual-role (admin + student), keep them in student dashboard when they choose it.
-    if (isAdmin && !isStudent) router.replace('/admin');
-  }, [isLoaded, isAdmin, router]);
+    if (isAdmin && !isStudent) router.replace('/admin/jobs');
+  }, [isLoaded, isAdmin, isStudent, router]);
 
   // Only fetch applications once we know the user is a student
   React.useEffect(() => {
@@ -78,7 +78,9 @@ function DashboardContent() {
     if (!isLoaded || isAdmin) return;
     const loadOnboarding = async () => {
       try {
-        const response = await fetch('/api/student/onboarding', { credentials: 'include' });
+        const studentEmail = user?.primaryEmailAddress?.emailAddress;
+        const query = studentEmail ? `?studentEmail=${encodeURIComponent(studentEmail)}` : '';
+        const response = await fetch(`/api/student/onboarding${query}`, { credentials: 'include' });
         if (!response.ok) throw new Error('Failed to load onboarding');
         const data = await response.json();
         setOnboardingStatus(data.completed ? 'complete' : 'required');
@@ -87,7 +89,7 @@ function DashboardContent() {
       }
     };
     loadOnboarding().catch(() => setOnboardingStatus('required'));
-  }, [isLoaded, isAdmin]);
+  }, [isLoaded, isAdmin, user]);
 
   // Still figuring out who the user is — show nothing yet
   if (!isLoaded || (isAdmin && !isStudent)) {

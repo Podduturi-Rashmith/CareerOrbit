@@ -1,245 +1,326 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 import RoleGate from '@/components/RoleGate';
 import {
   APPLICATION_CATEGORY_MAP,
-  loadAdminApplications,
   type AdminApplicationRecord,
   type ApplicationCategory,
 } from '@/lib/admin/applications-store';
 import { MOCK_STUDENTS } from '@/lib/mock-data';
-import { BriefcaseBusiness, CalendarDays, Search } from 'lucide-react';
+import { adminTheme } from '@/lib/admin/admin-theme';
+import { cn } from '@/lib/utils';
+import { Download, FileText, Sparkles } from 'lucide-react';
+import { classifyStudentRole } from '@/lib/admin/role-classification';
+import { toDateInputValue } from '@/lib/admin/date-utils';
+import { apiFetchJson } from '@/lib/client/api';
 
-type DatePreset = 'all' | 'today' | 'last7' | 'last30' | 'custom';
+type JobRecord = AdminApplicationRecord & { jobLink?: string };
+type JobCategory = ApplicationCategory;
+type ResumeResponse = {
+  id: string;
+  studentEmail: string;
+  fileName: string;
+  mimeType: string;
+  fileDataUrl: string;
+  extractedText: string;
+};
+type DraftResponse = {
+  id: string;
+  createdAt: number;
+  studentName: string;
+  companyName: string;
+  jobTitle: string;
+  downloadUrl: string;
+};
 
-function toDateInputValue(d: Date) {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-function parseDateOnly(value: string) {
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
+const ROLE_CATEGORIES = Object.keys(APPLICATION_CATEGORY_MAP) as JobCategory[];
 
 export default function AdminApplicationsPage() {
-  const categoryOptions = React.useMemo(() => Object.keys(APPLICATION_CATEGORY_MAP) as ApplicationCategory[], []);
-  const [applications, setApplications] = React.useState<AdminApplicationRecord[]>([]);
-  const [categoryFilter, setCategoryFilter] = React.useState<ApplicationCategory | 'all'>('all');
-  const [search, setSearch] = React.useState('');
-  const [datePreset, setDatePreset] = React.useState<DatePreset>('all');
-  const [fromDate, setFromDate] = React.useState('');
-  const [toDate, setToDate] = React.useState('');
+  const [jobs, setJobs] = React.useState<JobRecord[]>([]);
+  const [category, setCategory] = React.useState<JobCategory>(ROLE_CATEGORIES[0]);
+  const [selectedJobId, setSelectedJobId] = React.useState('');
+  const [selectedStudentEmail, setSelectedStudentEmail] = React.useState('');
+  const [masterResume, setMasterResume] = React.useState<ResumeResponse | null>(null);
+  const [generating, setGenerating] = React.useState(false);
+  const [latestDraft, setLatestDraft] = React.useState<DraftResponse | null>(null);
+  const [appliedOn, setAppliedOn] = React.useState(toDateInputValue(new Date()));
+  const [notes, setNotes] = React.useState('');
+  const [savingRecord, setSavingRecord] = React.useState(false);
+  const [feedback, setFeedback] = React.useState<string>('');
 
   React.useEffect(() => {
-    const sync = () => {
-      const data = loadAdminApplications();
-      const normalized = data.map((app) => {
-        if (app.studentId && app.studentName) return app;
-        const fallback = MOCK_STUDENTS[0];
-        return {
-          ...app,
-          studentId: fallback?.studentId || 'unknown',
-          studentName: fallback?.name || 'Unknown Student',
-        };
-      });
-      setApplications(normalized);
+    const loadJobs = async () => {
+      const data = await apiFetchJson<{ jobs: JobRecord[] }>('/api/admin/jobs');
+      setJobs(Array.isArray(data.jobs) ? data.jobs : []);
     };
-    sync();
-    window.addEventListener('storage', sync);
-    return () => window.removeEventListener('storage', sync);
+    loadJobs().catch(() => setJobs([]));
   }, []);
 
-  const filtered = React.useMemo(() => {
-    const now = new Date();
-    const today = parseDateOnly(toDateInputValue(now));
-    let start: Date | null = null;
-    let end: Date | null = null;
+  const filteredJobs = React.useMemo(
+    () => jobs.filter((job) => job.category === category),
+    [category, jobs]
+  );
+  const filteredStudents = React.useMemo(
+    () => MOCK_STUDENTS.filter((student) => classifyStudentRole(student) === category),
+    [category]
+  );
 
-    if (datePreset === 'today' && today) {
-      start = today;
-      end = today;
-    } else if (datePreset === 'last7' && today) {
-      start = new Date(today);
-      start.setDate(start.getDate() - 6);
-      end = today;
-    } else if (datePreset === 'last30' && today) {
-      start = new Date(today);
-      start.setDate(start.getDate() - 29);
-      end = today;
-    } else if (datePreset === 'custom') {
-      start = fromDate ? parseDateOnly(fromDate) : null;
-      end = toDate ? parseDateOnly(toDate) : null;
+  React.useEffect(() => {
+    if (!filteredJobs.some((job) => job.id === selectedJobId)) {
+      setSelectedJobId(filteredJobs[0]?.id || '');
     }
+  }, [filteredJobs, selectedJobId]);
 
-    const q = search.trim().toLowerCase();
-    return applications
-      .filter((a) => (categoryFilter === 'all' ? true : a.category === categoryFilter))
-      .filter((a) => {
-        if (datePreset === 'all') return true;
-        const d = parseDateOnly(a.date);
-        if (!d) return false;
-        if (start && d < start) return false;
-        if (end && d > end) return false;
-        return true;
-      })
-      .filter((a) => {
-        if (!q) return true;
-        return `${a.companyName} ${a.jobTitle} ${a.subcategory} ${a.category}`.toLowerCase().includes(q);
-      })
-      .sort((a, b) => b.createdAt - a.createdAt);
-  }, [applications, categoryFilter, datePreset, fromDate, search, toDate]);
+  React.useEffect(() => {
+    if (!filteredStudents.some((student) => student.email === selectedStudentEmail)) {
+      setSelectedStudentEmail(filteredStudents[0]?.email || '');
+    }
+  }, [filteredStudents, selectedStudentEmail]);
 
-  const grouped = React.useMemo(() => {
-    const out: Record<ApplicationCategory, AdminApplicationRecord[]> = {} as Record<ApplicationCategory, AdminApplicationRecord[]>;
-    for (const c of categoryOptions) out[c] = [];
-    for (const app of filtered) out[app.category].push(app);
-    return out;
-  }, [categoryOptions, filtered]);
+  const selectedJob = filteredJobs.find((job) => job.id === selectedJobId) || null;
+  const selectedStudent =
+    filteredStudents.find((student) => student.email === selectedStudentEmail) || null;
+
+  const refreshMasterResume = React.useCallback(async () => {
+    if (!selectedStudent?.email) {
+      setMasterResume(null);
+      return;
+    }
+    const data = await apiFetchJson<{ resume: ResumeResponse | null }>(
+      `/api/admin/master-resumes?studentEmail=${encodeURIComponent(selectedStudent.email)}`
+    );
+    const resume = data.resume || null;
+    setMasterResume(resume);
+  }, [selectedStudent?.email]);
+
+  React.useEffect(() => {
+    refreshMasterResume().catch(() => {
+      setMasterResume(null);
+    });
+  }, [refreshMasterResume]);
+
+  const onGenerateResume = async () => {
+    if (!selectedJob || !selectedStudent) return;
+    setFeedback('');
+    setGenerating(true);
+    try {
+      const data = await apiFetchJson<{ draft: DraftResponse | null }>(
+        `/api/admin/jobs/${selectedJob.id}/tailor`,
+        {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyName: selectedJob.companyName,
+          jobTitle: selectedJob.jobTitle,
+          jobDescription: selectedJob.jobDescription,
+          category: selectedJob.category,
+          studentId: selectedStudent.studentId,
+          studentName: selectedStudent.name,
+          studentEmail: selectedStudent.email,
+        }),
+      }
+      );
+      setLatestDraft(data.draft || null);
+      setFeedback('Tailored resume generated successfully.');
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Failed to generate tailored resume.');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const onSaveAppliedRecord = async () => {
+    if (!selectedJob || !selectedStudent || !latestDraft) return;
+    setSavingRecord(true);
+    setFeedback('');
+    try {
+      await apiFetchJson('/api/admin/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobId: selectedJob.id,
+          jobTitle: selectedJob.jobTitle,
+          companyName: selectedJob.companyName,
+          category: selectedJob.category,
+          studentId: selectedStudent.studentId,
+          studentName: selectedStudent.name,
+          studentEmail: selectedStudent.email,
+          draftId: latestDraft.id,
+          draftFileName: `${selectedStudent.name}-${selectedJob.companyName}-${selectedJob.jobTitle}.docx`,
+          appliedOn,
+          notes,
+        }),
+      });
+      setNotes('');
+      setFeedback('Applied record saved.');
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Failed to save applied record.');
+    } finally {
+      setSavingRecord(false);
+    }
+  };
 
   return (
     <RoleGate expectedRole="admin">
       <DashboardLayout>
         <div className="space-y-6">
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8">
-            <p className="text-xs uppercase tracking-[0.2em] font-bold text-slate-500">Admin Workspace</p>
-            <h1 className="mt-2 text-2xl md:text-3xl font-display font-black text-slate-900">Applications</h1>
-            <p className="mt-2 text-sm text-slate-500 max-w-2xl">
-              All applications created in the Jobs panel are stored and organized here by category for easy tracking.
+          <section className={adminTheme.hero}>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-200/80">Admin Applications</p>
+            <h1 className="mt-2 text-3xl font-display font-black tracking-tight text-white md:text-4xl">
+              Apply Jobs for Students
+            </h1>
+            <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
+              Select job and student by category, generate a tailored resume from the student master resume, then record applied status.
             </p>
           </section>
 
-          <section className="rounded-3xl border border-slate-200 bg-white overflow-hidden">
-            <div className="px-6 py-5 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-2">
-                <BriefcaseBusiness className="w-5 h-5 text-slate-700" />
-                <h2 className="text-lg font-bold text-slate-900">Saved Applications</h2>
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap">
-                <label className="text-xs font-semibold text-slate-600">
-                  Date
-                  <select
-                    value={datePreset}
-                    onChange={(e) => setDatePreset(e.target.value as DatePreset)}
-                    className="ml-2 rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700"
-                  >
-                    <option value="all">All time</option>
-                    <option value="today">Today</option>
-                    <option value="last7">Last 7 days</option>
-                    <option value="last30">Last 30 days</option>
-                    <option value="custom">Custom range</option>
-                  </select>
-                </label>
-
-                <label className="text-xs font-semibold text-slate-600">
+          <section className={cn(adminTheme.surface, 'overflow-hidden')}>
+            <div className={cn(adminTheme.sectionHeader, 'px-6 py-5')}>
+              <h2 className="text-xl font-black text-white">Generate Resume</h2>
+            </div>
+            <div className="space-y-5 p-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <label className={adminTheme.fieldLabel}>
                   Category
                   <select
-                    value={categoryFilter}
-                    onChange={(e) => setCategoryFilter(e.target.value as ApplicationCategory | 'all')}
-                    className="ml-2 rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value as JobCategory)}
+                    className={adminTheme.select}
                   >
-                    <option value="all">All categories</option>
-                    {categoryOptions.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
+                    {ROLE_CATEGORIES.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
                       </option>
                     ))}
                   </select>
                 </label>
+                <label className={adminTheme.fieldLabel}>
+                  Job
+                  <select
+                    value={selectedJobId}
+                    onChange={(e) => setSelectedJobId(e.target.value)}
+                    className={adminTheme.select}
+                  >
+                    {filteredJobs.length === 0 && <option value="">No jobs in this category</option>}
+                    {filteredJobs.map((job) => (
+                      <option key={job.id} value={job.id}>
+                        {job.companyName} - {job.jobTitle}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className={adminTheme.fieldLabel}>
+                  Student
+                  <select
+                    value={selectedStudentEmail}
+                    onChange={(e) => setSelectedStudentEmail(e.target.value)}
+                    className={adminTheme.select}
+                  >
+                    {filteredStudents.length === 0 && (
+                      <option value="">No students in this category</option>
+                    )}
+                    {filteredStudents.map((student) => (
+                      <option key={student.email} value={student.email}>
+                        {student.name} - {student.email}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
 
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search applications..."
-                    className="w-72 pl-9 pr-3 py-2 rounded-lg border border-slate-300 bg-white text-sm outline-none focus:ring-2 focus:ring-teal-600/25"
-                  />
+              <div className={cn(adminTheme.surfaceSubtle, 'space-y-3 p-4')}>
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-lime-200" />
+                  <p className="text-sm font-semibold text-slate-200">Student Master Resume</p>
+                </div>
+                <p className="text-xs text-slate-400">
+                  Automatically loaded from Student Database for the selected student.
+                </p>
+                {masterResume && (
+                  <div className="rounded-xl border border-lime-300/20 bg-lime-300/10 px-3 py-2 text-xs text-lime-100">
+                    Loaded: {masterResume.fileName}
+                  </div>
+                )}
+                {!masterResume && (
+                  <div className="rounded-xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs text-rose-100">
+                    No master resume found for this student. Add it in Admin &gt; Students first.
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={onGenerateResume}
+                  disabled={!selectedJob || !selectedStudent || !masterResume || generating}
+                  className={adminTheme.buttonPrimary}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <Sparkles className="h-4 w-4" />
+                    {generating ? 'Generating...' : 'Generate Resume'}
+                  </span>
+                </button>
+                {latestDraft?.downloadUrl && (
+                  <a href={latestDraft.downloadUrl} className={adminTheme.linkAccent}>
+                    <span className="inline-flex items-center gap-1">
+                      <Download className="h-4 w-4" />
+                      Download Generated Resume
+                    </span>
+                  </a>
+                )}
+              </div>
+            </div>
+          </section>
+
+          <section className={cn(adminTheme.surface, 'overflow-hidden')}>
+            <div className={cn(adminTheme.sectionHeader, 'px-6 py-5')}>
+              <h2 className="text-xl font-black text-white">Mark Applied</h2>
+            </div>
+            <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-3">
+              <label className={adminTheme.fieldLabel}>
+                Applied On
+                <input
+                  type="date"
+                  value={appliedOn}
+                  onChange={(e) => setAppliedOn(e.target.value)}
+                  className={adminTheme.input}
+                />
+              </label>
+              <label className={cn(adminTheme.fieldLabel, 'md:col-span-2')}>
+                Notes
+                <input
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className={adminTheme.input}
+                  placeholder="Optional notes after applying"
+                />
+              </label>
+              <div className="md:col-span-3">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={onSaveAppliedRecord}
+                    disabled={!selectedJob || !selectedStudent || !latestDraft || savingRecord}
+                    className={adminTheme.buttonPrimary}
+                  >
+                    {savingRecord ? 'Saving...' : 'Save Applied Record'}
+                  </button>
+                  <Link href="/admin/applications/records" className={adminTheme.linkAccent}>
+                    View Applied Jobs Records
+                  </Link>
                 </div>
               </div>
             </div>
-
-            <div className="p-6 space-y-4">
-              {datePreset === 'custom' && (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-3 flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase tracking-wider">
-                    <CalendarDays className="w-4 h-4" /> Custom Date Range
-                  </div>
-                  <label className="text-xs font-semibold text-slate-600">
-                    From
-                    <input
-                      type="date"
-                      value={fromDate}
-                      onChange={(e) => setFromDate(e.target.value)}
-                      className="ml-2 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-700"
-                    />
-                  </label>
-                  <label className="text-xs font-semibold text-slate-600">
-                    To
-                    <input
-                      type="date"
-                      value={toDate}
-                      onChange={(e) => setToDate(e.target.value)}
-                      className="ml-2 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-700"
-                    />
-                  </label>
-                </div>
-              )}
-
-              {categoryOptions.map((category) => {
-                const items = grouped[category];
-                if (categoryFilter !== 'all' && categoryFilter !== category) return null;
-                return (
-                  <div key={category} className="rounded-2xl border border-slate-200 overflow-hidden">
-                    <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-                      <p className="text-sm font-extrabold text-slate-900">{category}</p>
-                      <span className="text-xs font-bold text-slate-500">{items.length} applications</span>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left">
-                        <thead>
-                          <tr className="bg-white">
-                            <th className="px-4 py-3 text-xs uppercase tracking-wider text-slate-500 font-bold">Company</th>
-                            <th className="px-4 py-3 text-xs uppercase tracking-wider text-slate-500 font-bold">Job Title</th>
-                            <th className="px-4 py-3 text-xs uppercase tracking-wider text-slate-500 font-bold">Subcategory</th>
-                            <th className="px-4 py-3 text-xs uppercase tracking-wider text-slate-500 font-bold">Student</th>
-                            <th className="px-4 py-3 text-xs uppercase tracking-wider text-slate-500 font-bold">Date</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200">
-                          {items.map((app) => (
-                            <tr key={app.id} className="hover:bg-slate-50/70">
-                              <td className="px-4 py-3 text-sm font-semibold text-slate-900">{app.companyName}</td>
-                              <td className="px-4 py-3 text-sm text-slate-700">{app.jobTitle}</td>
-                              <td className="px-4 py-3 text-sm text-slate-700">{app.subcategory}</td>
-                              <td className="px-4 py-3 text-sm text-slate-700">{app.studentName}</td>
-                              <td className="px-4 py-3 text-sm text-slate-600">{app.date}</td>
-                            </tr>
-                          ))}
-                          {items.length === 0 && (
-                            <tr>
-                              <td colSpan={5} className="px-4 py-6 text-sm text-center text-slate-500">
-                                No applications in this category.
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
           </section>
+
+          {feedback && (
+            <div className="rounded-xl border border-lime-300/30 bg-lime-300/10 px-4 py-3 text-sm text-lime-100">
+              {feedback}
+            </div>
+          )}
         </div>
       </DashboardLayout>
     </RoleGate>
   );
 }
-

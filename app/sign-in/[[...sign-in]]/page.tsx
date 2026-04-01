@@ -84,7 +84,7 @@ const appearance = {
 }
 
 export default async function SignInPage({ searchParams }: any) {
-  // Home passes `redirect_url=/admin` or `redirect_url=/dashboard`.
+  // Home passes `redirect_url=/admin/jobs` or `redirect_url=/dashboard`.
   // Clerk's `forceRedirectUrl` needs to reflect that choice.
   const sp = (await searchParams) ?? {}
   const redirectFromQueryRaw = sp?.redirect_url
