@@ -2,7 +2,6 @@
 
 import React from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
-import RoleGate from '@/components/RoleGate';
 import { 
   Download,
   ExternalLink,
@@ -53,8 +52,7 @@ export default function ApplicationsPage() {
   }, []);
 
   return (
-    <RoleGate expectedRole="student">
-      <DashboardLayout>
+    <DashboardLayout>
       <div className="space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -127,7 +125,6 @@ export default function ApplicationsPage() {
           </div>
         </div>
       </div>
-      </DashboardLayout>
-    </RoleGate>
+    </DashboardLayout>
   );
 }

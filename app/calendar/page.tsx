@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
-import RoleGate from '@/components/RoleGate';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -285,9 +284,8 @@ export default function CalendarPage() {
   const selectedDayEvents = filteredEvents.filter((event) => isSameDay(new Date(event.date), selectedDate));
 
   return (
-    <RoleGate expectedRole="student">
-      <DashboardLayout>
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+    <DashboardLayout>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         <div className="lg:col-span-3">
           {renderHeader()}
           {renderAdminFilters()}
@@ -364,8 +362,7 @@ export default function CalendarPage() {
             </p>
           </div>
         </div>
-        </div>
-      </DashboardLayout>
-    </RoleGate>
+      </div>
+    </DashboardLayout>
   );
 }

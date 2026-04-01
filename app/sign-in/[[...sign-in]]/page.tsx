@@ -97,7 +97,6 @@ export default async function SignInPage({ searchParams }: any) {
     (redirectFromQuery.startsWith('/admin') || redirectFromQuery.startsWith('/dashboard'))
       ? redirectFromQuery
       : '/dashboard'
-
   return (
     <div className="relative min-h-screen overflow-hidden" style={{ background: '#090c15' }}>
       {/* Dot grid */}

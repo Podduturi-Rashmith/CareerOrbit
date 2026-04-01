@@ -18,47 +18,21 @@ export default clerkMiddleware(async (auth, req) => {
     return redirectToSignIn({ returnBackUrl: req.url })
   }
 
-  // Clerk role may be stored under different claim paths depending on your Clerk setup.
-  // We try multiple candidates to avoid false "student" defaults.
-  const sessionAny = sessionClaims as any
-  const rawRole =
-    sessionAny?.metadata?.role
-    ?? sessionAny?.publicMetadata?.role
-    ?? sessionAny?.claims?.metadata?.role
-    ?? sessionAny?.claims?.role
-    ?? sessionAny?.claims?.publicMetadata?.role
-    ?? sessionAny?.claims?.public_metadata?.role
-    ?? sessionAny?.claims?.public_metadata?.roles
-    ?? undefined
-
-  const rawRoleCandidates = {
-    metadataRole: sessionAny?.metadata?.role,
-    publicMetadataRole: sessionAny?.publicMetadata?.role,
-    claimsMetadataRole: sessionAny?.claims?.metadata?.role,
-    claimsRole: sessionAny?.claims?.role,
-    claimsPublicMetadataRole: sessionAny?.claims?.publicMetadata?.role,
-    claimsPublicMetadataSnakeRole: sessionAny?.claims?.public_metadata?.role,
-  }
-  const role = typeof rawRole === 'string' ? rawRole.toLowerCase() : rawRole
+  const role = (sessionClaims?.metadata as Record<string, string> | undefined)?.role
   const path = req.nextUrl.pathname
   const isAdmin = role === 'admin' || role === 'sub-admin'
   const isExplicitStudent = role === 'student'
-  const isStudentRoute =
-    path.startsWith('/dashboard')
-    || path.startsWith('/applications')
-    || path.startsWith('/calendar')
-    || path.startsWith('/profile')
-    || path.startsWith('/api/student')
-  const isAdminRoute = path.startsWith('/admin') || path.startsWith('/api/admin')
+  const isStudentArea = path.startsWith('/dashboard')
 
-  // Admin users are restricted to admin area only.
-  if (isStudentRoute && isAdmin) {
+  // Admin users should not stay in student dashboard routes.
+  if (isStudentArea && isAdmin) {
     return NextResponse.redirect(new URL('/admin/jobs', req.url))
   }
 
-  // Student users are restricted to student area only.
-  if (isAdminRoute && isExplicitStudent) {
-    return NextResponse.redirect(new URL('/access-denied?reason=admin-only&returnUrl=%2Fdashboard', req.url))
+  // Only block /admin if we KNOW they're a student (not if role is missing/stale JWT)
+  // If role is undefined, let the page handle it via useUser() which fetches fresh data
+  if (path.startsWith('/admin') && isExplicitStudent) {
+    return NextResponse.redirect(new URL('/dashboard', req.url))
   }
 })
 
