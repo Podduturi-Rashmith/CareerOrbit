@@ -37,15 +37,12 @@ jobs:
 
     env:
       # Dummy values so Next.js build doesn't fail on missing env vars
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_dummy
+      CLERK_SECRET_KEY: sk_test_dummy
       GEMINI_API_KEY: dummy
       APP_URL: http://localhost:3000
       MONGODB_URI: mongodb://localhost:27017/careerorbit
       MONGODB_DB_NAME: careerorbit
-      SESSION_SECRET: dummy-secret-for-ci-build-only
-      DATA_ENCRYPTION_KEY: ZHVtbXkta2V5LWZvci1jaS1idWlsZC1vbmx5AAAA
-      GOOGLE_CLIENT_ID: dummy
-      GOOGLE_CLIENT_SECRET: dummy
-      GOOGLE_REDIRECT_URI: http://localhost:3000/api/auth/google/callback
 
     steps:
       - name: Checkout code
