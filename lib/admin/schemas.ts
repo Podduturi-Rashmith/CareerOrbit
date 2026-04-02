@@ -77,6 +77,50 @@ export const TailorRequestPayloadSchema = z.object({
   category: z.string().trim().default(''),
 });
 
+export const TailorDraftUpdatePayloadSchema = z.object({
+  content: z.string().trim().min(1, 'Resume content cannot be empty.'),
+});
+
+const ChatRoleSchema = z.enum(['user', 'assistant']);
+
+export const TailorBulletsChatPayloadSchema = z
+  .object({
+    studentEmail: z.string().trim().email(),
+    messages: z.array(
+      z.object({
+        role: ChatRoleSchema,
+        content: z.string(),
+      })
+    ),
+    priorBullets: z
+      .array(
+        z.object({
+          text: z.string(),
+          sourceSection: z.string().trim().optional(),
+          targetRole: z.string().trim().optional(),
+          needsUserInput: z.boolean().optional(),
+        })
+      )
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    const nonempty = data.messages.filter((m) => m.content.trim().length > 0);
+    if (nonempty.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'At least one message with content is required.',
+      });
+      return;
+    }
+    const last = nonempty[nonempty.length - 1];
+    if (last.role !== 'user') {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'The latest message must be from the user.',
+      });
+    }
+  });
+
 const WorkExperienceSchema = z.object({
   companyName: z.string().trim().default(''),
   location: z.string().trim().default(''),

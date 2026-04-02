@@ -1,135 +1,308 @@
 import { NextResponse } from 'next/server';
-import mammoth from 'mammoth';
+import { extractMasterResumePlainText } from '@/lib/admin/master-resume-plain-text';
 import { getStudentMasterResumeByEmail } from '@/lib/admin/master-resume-store';
 import { createTailoredResumeDraft } from '@/lib/admin/tailored-resume-store';
 import { getAdminJobById } from '@/lib/admin/jobs-store';
 import { jsonError, parseJsonObject, serverErrorResponse } from '@/lib/server/http';
 import { TailorRequestPayloadSchema } from '@/lib/admin/schemas';
-import {
-  findSectionIndices,
-  normalizeRewrittenLine,
-  stripMarkdownAndLinks,
-  type SectionRange,
-} from '@/lib/jobs/tailor-text';
 
 export const runtime = 'nodejs';
 
-function parseDataUrl(dataUrl: string): { mimeType: string; bytes: Buffer } | null {
-  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-  if (!match) return null;
-  const mimeType = match[1] || 'application/octet-stream';
-  const bytes = Buffer.from(match[2] || '', 'base64');
-  return { mimeType, bytes };
+type ResumeAnalysis = {
+  match_score: number;
+  missing_skills: string[];
+  suggested_skills: string[];
+  professional_summary: string;
+  experience_bullets: Array<{
+    source_section: string;
+    target_role: string;
+    text: string;
+    needs_user_input: boolean;
+  }>;
+  project_suggestions: Array<{
+    title: string;
+    description: string;
+    keywords: string[];
+  }>;
+  ats_keywords_used: string[];
+  notes: string[];
+};
+
+function stripMarkdownCodeFence(text: string): string {
+  let t = text.trim();
+  const fenced = /^```(?:json)?\s*\n?([\s\S]*?)```/im.exec(t);
+  if (fenced?.[1]) t = fenced[1].trim();
+  return t;
 }
 
-async function getMasterResumePlainText(input: {
-  mimeType: string;
-  fileName: string;
-  fileDataUrl: string;
-  extractedText: string;
-}): Promise<string> {
-  if (input.extractedText?.trim()) return input.extractedText.trim();
-  const parsed = parseDataUrl(input.fileDataUrl);
-  if (!parsed) return '';
-
-  const lowerName = input.fileName.toLowerCase();
-  const mime = (input.mimeType || parsed.mimeType || '').toLowerCase();
-  if (mime.startsWith('text/') || lowerName.endsWith('.txt') || lowerName.endsWith('.md')) {
-    return parsed.bytes.toString('utf8').trim();
+/** Extract a single JSON object from model text (handles prose before/after and ```json fences). */
+function extractBalancedJsonObject(text: string): string | null {
+  const stripped = stripMarkdownCodeFence(text);
+  const start = stripped.indexOf('{');
+  if (start < 0) return null;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < stripped.length; i++) {
+    const c = stripped[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (inString) {
+      if (c === '\\') escape = true;
+      else if (c === '"') inString = false;
+      continue;
+    }
+    if (c === '"') {
+      inString = true;
+      continue;
+    }
+    if (c === '{') depth += 1;
+    else if (c === '}') {
+      depth -= 1;
+      if (depth === 0) return stripped.slice(start, i + 1);
+    }
   }
-  if (
-    mime.includes('wordprocessingml.document') ||
-    lowerName.endsWith('.docx')
-  ) {
-    const result = await mammoth.extractRawText({ buffer: parsed.bytes });
-    return (result.value || '').trim();
-  }
-  return '';
+  return null;
 }
 
-async function rewriteResumeSectionsWithAnthropic(input: {
+function parseModelJsonOutput(raw: string): unknown | null {
+  const candidate = extractBalancedJsonObject(raw);
+  if (!candidate) return null;
+  try {
+    return JSON.parse(candidate);
+  } catch {
+    return null;
+  }
+}
+
+function unwrapAnalysisPayload(raw: unknown): Record<string, unknown> | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const nested =
+    (typeof o.analysis === 'object' && o.analysis && (o.analysis as object)) ||
+    (typeof o.result === 'object' && o.result && (o.result as object)) ||
+    (typeof o.data === 'object' && o.data && (o.data as object)) ||
+    null;
+  return (nested as Record<string, unknown>) || o;
+}
+
+function pickFiniteNumber(...vals: unknown[]): number | null {
+  for (const v of vals) {
+    if (typeof v === 'number' && Number.isFinite(v)) return v;
+    if (typeof v === 'string' && v.trim()) {
+      const n = Number(v.trim());
+      if (Number.isFinite(n)) return n;
+    }
+  }
+  return null;
+}
+
+function asStringArrayLoose(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((item) => {
+      if (typeof item === 'string') return item.trim();
+      if (item && typeof item === 'object' && 'skill' in (item as object)) {
+        const s = (item as { skill?: unknown }).skill;
+        return typeof s === 'string' ? s.trim() : '';
+      }
+      if (item && typeof item === 'object' && 'name' in (item as object)) {
+        const s = (item as { name?: unknown }).name;
+        return typeof s === 'string' ? s.trim() : '';
+      }
+      return '';
+    })
+    .filter(Boolean);
+}
+
+function truthyFlag(v: unknown): boolean {
+  return v === true || v === 'true' || v === 1 || v === '1';
+}
+
+type TailorApiAnalysis = {
+  matchScore: number;
+  missingSkills: string[];
+  suggestedSkills: string[];
+  professionalSummary: string;
+  experienceBullets: Array<{
+    sourceSection: string;
+    targetRole: string;
+    text: string;
+    needsUserInput: boolean;
+  }>;
+  projectSuggestions: Array<{
+    title: string;
+    description: string;
+    keywords: string[];
+  }>;
+  atsKeywordsUsed: string[];
+  notes: string[];
+};
+
+function coerceAnalysis(raw: unknown): ResumeAnalysis | null {
+  const value = unwrapAnalysisPayload(raw);
+  if (!value) return null;
+
+  const missing = asStringArrayLoose(value.missing_skills ?? value.missingSkills ?? value.gaps);
+  const suggested = asStringArrayLoose(value.suggested_skills ?? value.suggestedSkills ?? value.recommendedSkills);
+  const ats = asStringArrayLoose(value.ats_keywords_used ?? value.atsKeywordsUsed ?? value.keywordsMatched);
+  const notes = asStringArrayLoose(value.notes ?? value.scannerNotes);
+
+  const expRaw =
+    value.experience_bullets ??
+    value.experienceBullets ??
+    value.experience ??
+    value.tailoredBullets ??
+    value.bullets;
+
+  const experience = Array.isArray(expRaw)
+    ? expRaw
+        .map((item) => {
+          if (typeof item === 'string') {
+            const text = item.trim();
+            if (!text) return null;
+            return {
+              source_section: 'experience',
+              target_role: '',
+              text,
+              needs_user_input: false,
+            };
+          }
+          const row = item as Record<string, unknown>;
+          const text =
+            (typeof row.text === 'string' && row.text.trim()) ||
+            (typeof row.bullet === 'string' && row.bullet.trim()) ||
+            (typeof row.content === 'string' && row.content.trim()) ||
+            '';
+          if (!text) return null;
+          const sourceSection =
+            (typeof row.source_section === 'string' && row.source_section.trim()) ||
+            (typeof row.sourceSection === 'string' && row.sourceSection.trim()) ||
+            'experience';
+          const targetRole =
+            (typeof row.target_role === 'string' && row.target_role.trim()) ||
+            (typeof row.targetRole === 'string' && row.targetRole.trim()) ||
+            '';
+          return {
+            source_section: sourceSection,
+            target_role: targetRole,
+            text,
+            needs_user_input:
+              truthyFlag(row.needs_user_input) || truthyFlag(row.needsUserInput ?? row.verify),
+          };
+        })
+        .filter((row): row is NonNullable<typeof row> => !!row)
+    : [];
+
+  const projRaw = value.project_suggestions ?? value.projectSuggestions ?? value.projects;
+  const projects = Array.isArray(projRaw)
+    ? projRaw
+        .map((item) => {
+          const row = item as Record<string, unknown>;
+          const title =
+            (typeof row.title === 'string' && row.title.trim()) ||
+            (typeof row.name === 'string' && row.name.trim()) ||
+            '';
+          const description =
+            (typeof row.description === 'string' && row.description.trim()) ||
+            (typeof row.summary === 'string' && row.summary.trim()) ||
+            '';
+          if (!title || !description) return null;
+          return {
+            title,
+            description,
+            keywords: asStringArrayLoose(row.keywords),
+          };
+        })
+        .filter((row): row is NonNullable<typeof row> => !!row)
+    : [];
+
+  let summary =
+    (typeof value.professional_summary === 'string' && value.professional_summary.trim()) ||
+    (typeof value.professionalSummary === 'string' && value.professionalSummary.trim()) ||
+    (typeof value.summary === 'string' && value.summary.trim()) ||
+    '';
+
+  if (!summary && (experience.length > 0 || missing.length > 0 || suggested.length > 0)) {
+    summary =
+      'Results-driven candidate targeting this role; refine this summary using the suggested bullets and keywords below.';
+  }
+
+  let matchScore = pickFiniteNumber(value.match_score, value.matchScore, value.match, value.score);
+  if (matchScore === null) {
+    if (summary || experience.length > 0) matchScore = 55;
+    else return null;
+  }
+
+  if (!summary) return null;
+
+  return {
+    match_score: Math.max(0, Math.min(100, Math.round(matchScore))),
+    missing_skills: missing,
+    suggested_skills: suggested,
+    professional_summary: summary,
+    experience_bullets: experience,
+    project_suggestions: projects,
+    ats_keywords_used: ats,
+    notes,
+  };
+}
+
+type AnthropicAnalyzeResult =
+  | { ok: true; analysis: ResumeAnalysis }
+  | { ok: false; message: string; httpStatus?: number };
+
+async function analyzeResumeWithAnthropic(input: {
   model: string;
   apiKey: string;
+  studentName: string;
+  studentEmail: string;
   jobTitle: string;
   companyName: string;
   jobDescription: string;
-  lines: string[];
-  summaryRange: SectionRange | null;
-  experienceRange: SectionRange | null;
-}): Promise<
-  | { rewrittenLines: string[]; failure: null }
-  | {
-      rewrittenLines: null;
-      failure:
-        | 'no_rewritable_lines'
-        | 'anthropic_request_failed'
-        | 'empty_response'
-        | 'missing_json'
-        | 'invalid_json'
-        | 'shape_mismatch';
-    }
-> {
-  const isExperienceMetaLine = (line: string) => {
-    const t = line.trim();
-    if (!t) return true;
-    const hasSentencePunctuation = /[.!?]$/.test(t);
-    const hasActionVerb =
-      /\b(designed|developed|built|implemented|managed|optimized|collaborated|supported|created|improved|integrated|troubleshot|engineered|led|delivered|deployed|analyzed)\b/i.test(
-        t
-      );
-    const looksLikeDateRange =
-      /\b(19|20)\d{2}\b/.test(t) && (/\b(Present|Current)\b/i.test(t) || /[-–]/.test(t));
-    const looksLikeCompanyLocationLine =
-      t.length < 80 && /^[A-Za-z .'-]+,\s*[A-Za-z .'-]+$/.test(t);
-    const looksLikeRoleLine =
-      t.length < 60 &&
-      /engineer|developer|analyst|manager|intern|scientist/i.test(t) &&
-      !hasSentencePunctuation;
-    return looksLikeDateRange || looksLikeCompanyLocationLine || (looksLikeRoleLine && !hasActionVerb);
-  };
-
-  const summaryIndices =
-    input.summaryRange
-      ? input.lines
-          .slice(input.summaryRange.start + 1, input.summaryRange.end)
-          .map((line, idx) => ({ line, idx: input.summaryRange!.start + 1 + idx }))
-          .filter((row) => row.line.trim().length > 0)
-      : [];
-  const experienceBulletIndices =
-    input.experienceRange
-      ? input.lines
-          .slice(input.experienceRange.start + 1, input.experienceRange.end)
-          .map((line, idx) => ({ line, idx: input.experienceRange!.start + 1 + idx }))
-          .filter((row) => {
-            const trimmed = row.line.trim();
-            if (!trimmed) return false;
-            if (/^[A-Z][A-Z ]{2,}$/.test(trimmed)) return false;
-            if (isExperienceMetaLine(trimmed)) return false;
-            return true;
-          })
-      : [];
-
-  if (summaryIndices.length === 0 && experienceBulletIndices.length === 0) {
-    return { rewrittenLines: null, failure: 'no_rewritable_lines' };
-  }
-
+  masterResumeText: string;
+}): Promise<AnthropicAnalyzeResult> {
   const payload = {
+    studentName: input.studentName,
+    studentEmail: input.studentEmail,
     jobTitle: input.jobTitle,
     companyName: input.companyName,
     jobDescription: input.jobDescription,
-    summaryLines: summaryIndices.map((row) => row.line),
-    experienceBulletLines: experienceBulletIndices.map((row) => row.line),
+    resumeText: input.masterResumeText,
+    outputSchema: {
+      match_score: 'number(0..100)',
+      missing_skills: 'string[]',
+      suggested_skills: 'string[]',
+      professional_summary: 'string',
+      experience_bullets:
+        'Array<{source_section:string,target_role:string,text:string,needs_user_input:boolean}>',
+      project_suggestions: 'Array<{title:string,description:string,keywords:string[]}>',
+      ats_keywords_used: 'string[]',
+      notes: 'string[]',
+    },
   };
 
   const prompt = [
-    'Rewrite resume lines to align with the target job, while preserving facts.',
-    'Return strict JSON with keys: summaryLines, experienceBulletLines.',
+    'You are an AI-powered resume optimization engine.',
+    'Analyze the resume against the job description.',
+    'Do not rewrite or output the full resume — only return the JSON fields below (no tailored_resume, no full text).',
+    'Respond with exactly one JSON object and nothing else (no markdown fences, no explanation).',
+    'Use these snake_case keys:',
+    'match_score (number 0-100), missing_skills (string[]), suggested_skills (string[]),',
+    'professional_summary (string, non-empty),',
+    'experience_bullets (array of { source_section, target_role, text, needs_user_input }),',
+    'project_suggestions (array of { title, description, keywords }),',
+    'ats_keywords_used (string[]), notes (string[]).',
     'Rules:',
-    '- Keep same array lengths as input arrays.',
-    '- Do not add or remove any line.',
-    '- Keep company names, locations, and dates unchanged (do not touch non-bullet experience lines).',
-    '- Keep personal information unchanged (name, email, phone, linkedin are outside these arrays).',
-    '- Only improve wording for impact and relevance to job description.',
+    '- Never invent companies, technologies, metrics, dates, or roles.',
+    '- Keep recommendations realistic for an entry-level profile if unclear.',
+    '- ATS-style content: professional_summary should be 3–4 short lines max, tailored with truthful JD keywords;',
+    '  experience_bullets start with strong action verbs and include measurable outcomes where the resume supports them;',
+    '  suggested_skills may imply Technical vs Soft groupings when appropriate; project_suggestions emphasize tech + impact for students.',
+    '- Use concise, ATS-friendly wording; avoid tables, columns, or graphics in your text suggestions.',
+    '- Avoid generic phrases like hardworking or team player.',
     '',
     JSON.stringify(payload),
   ].join('\n');
@@ -143,18 +316,24 @@ async function rewriteResumeSectionsWithAnthropic(input: {
     },
     body: JSON.stringify({
       model: input.model,
-      max_tokens: 1400,
-      temperature: 0.15,
+      max_tokens: 4096,
+      temperature: 0.2,
       messages: [{ role: 'user', content: prompt }],
     }),
   });
 
   const data = (await response.json().catch(() => null)) as
-    | { content?: Array<{ type?: string; text?: string }> }
+    | {
+        content?: Array<{ type?: string; text?: string }>;
+        error?: { message?: string; type?: string };
+      }
     | null;
 
   if (!response.ok) {
-    return { rewrittenLines: null, failure: 'anthropic_request_failed' };
+    const msg =
+      data?.error?.message ||
+      `Anthropic API request failed (HTTP ${response.status}). Check ANTHROPIC_API_KEY and ANTHROPIC_MODEL.`;
+    return { ok: false, message: msg, httpStatus: response.status };
   }
 
   const raw = (data?.content || [])
@@ -163,46 +342,47 @@ async function rewriteResumeSectionsWithAnthropic(input: {
     .join('\n')
     .trim();
   if (!raw) {
-    return { rewrittenLines: null, failure: 'empty_response' };
+    return {
+      ok: false,
+      message: 'Anthropic returned an empty response. Try again or verify your model name.',
+    };
   }
 
-  const jsonMatch = raw.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    return { rewrittenLines: null, failure: 'missing_json' };
+  const parsedJson = parseModelJsonOutput(raw);
+  if (!parsedJson) {
+    return {
+      ok: false,
+      message:
+        'Could not parse JSON from the model. It may have been truncated or wrapped differently — try a shorter job description or increase max tokens.',
+    };
   }
-  const parsed = (() => {
-    try {
-      return JSON.parse(jsonMatch[0]) as {
-        summaryLines?: string[];
-        experienceBulletLines?: string[];
-      };
-    } catch {
-      return null;
-    }
-  })();
-  if (!parsed) {
-    return { rewrittenLines: null, failure: 'invalid_json' };
+  const analysis = coerceAnalysis(parsedJson);
+  if (!analysis) {
+    return {
+      ok: false,
+      message:
+        'Resume scan output was incomplete. The model must return match_score and professional_summary (or bullets). Try again.',
+    };
   }
+  return { ok: true, analysis };
+}
 
-  const rewrittenSummary = Array.isArray(parsed.summaryLines) ? parsed.summaryLines : [];
-  const rewrittenBullets = Array.isArray(parsed.experienceBulletLines)
-    ? parsed.experienceBulletLines
-    : [];
-  if (rewrittenSummary.length !== summaryIndices.length) {
-    return { rewrittenLines: null, failure: 'shape_mismatch' };
-  }
-  if (rewrittenBullets.length !== experienceBulletIndices.length) {
-    return { rewrittenLines: null, failure: 'shape_mismatch' };
-  }
-
-  const out = [...input.lines];
-  summaryIndices.forEach((row, idx) => {
-    out[row.idx] = normalizeRewrittenLine(row.line, rewrittenSummary[idx] || row.line);
-  });
-  experienceBulletIndices.forEach((row, idx) => {
-    out[row.idx] = normalizeRewrittenLine(row.line, rewrittenBullets[idx] || row.line);
-  });
-  return { rewrittenLines: out, failure: null };
+function toTailorApiAnalysis(analysis: ResumeAnalysis): TailorApiAnalysis {
+  return {
+    matchScore: analysis.match_score,
+    missingSkills: analysis.missing_skills,
+    suggestedSkills: analysis.suggested_skills,
+    professionalSummary: analysis.professional_summary,
+    experienceBullets: analysis.experience_bullets.map((row) => ({
+      sourceSection: row.source_section,
+      targetRole: row.target_role,
+      text: row.text,
+      needsUserInput: row.needs_user_input,
+    })),
+    projectSuggestions: analysis.project_suggestions,
+    atsKeywordsUsed: analysis.ats_keywords_used,
+    notes: analysis.notes,
+  };
 }
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -244,7 +424,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       return jsonError('No uploaded master resume found for selected student.', 400);
     }
 
-    const masterResumeText = await getMasterResumePlainText({
+    const masterResumeText = await extractMasterResumePlainText({
       mimeType: masterResume.mimeType,
       fileName: masterResume.fileName,
       fileDataUrl: masterResume.fileDataUrl,
@@ -257,57 +437,38 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       );
     }
 
-    const baseLines = stripMarkdownAndLinks(masterResumeText).split('\n');
-    const summaryRange = findSectionIndices(baseLines, 'SUMMARY');
-    const experienceRange = findSectionIndices(baseLines, 'EXPERIENCE');
     const apiKey = process.env.ANTHROPIC_API_KEY;
-    const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
+    const model =
+      process.env.ANTHROPIC_MODEL?.trim() || 'claude-3-5-sonnet-20241022';
     if (!apiKey) {
       return jsonError(
         'Missing ANTHROPIC_API_KEY. Configure it before generating resumes.',
         500
       );
     }
-    if (!summaryRange && !experienceRange) {
-      return jsonError(
-        'Could not detect SUMMARY/EXPERIENCE sections in the master resume. Please upload a structured resume with those headings.',
-        400
-      );
-    }
-
-    const rewriteResult = await rewriteResumeSectionsWithAnthropic({
+    const anthropicResult = await analyzeResumeWithAnthropic({
       model,
       apiKey,
+      studentName,
+      studentEmail,
       jobTitle,
       companyName,
       jobDescription,
-      lines: baseLines,
-      summaryRange,
-      experienceRange,
+      masterResumeText,
     });
-    if (!rewriteResult.rewrittenLines?.join('\n').trim()) {
-      const failureMessage = {
-        no_rewritable_lines:
-          'No rewritable summary/experience lines found in the master resume.',
-        anthropic_request_failed:
-          'Resume rewrite request to Anthropic failed. Please retry.',
-        empty_response:
-          'Anthropic returned an empty rewrite response.',
-        missing_json:
-          'Anthropic response did not include the required JSON payload.',
-        invalid_json:
-          'Anthropic returned malformed JSON for resume rewrite.',
-        shape_mismatch:
-          'Anthropic rewrite output did not match the expected line structure.',
-      } as const;
-      const failureKey = rewriteResult.failure || 'shape_mismatch';
-      return jsonError(
-        `${failureMessage[failureKey]} No full-resume fallback is used.`,
-        422
-      );
+    if (!anthropicResult.ok) {
+      const status =
+        anthropicResult.httpStatus &&
+        anthropicResult.httpStatus >= 400 &&
+        anthropicResult.httpStatus < 600
+          ? anthropicResult.httpStatus
+          : 422;
+      return jsonError(anthropicResult.message, status);
     }
+    const analysis = anthropicResult.analysis;
 
-    const content = rewriteResult.rewrittenLines.join('\n');
+    /** Draft starts as the master resume text; suggestions are analysis-only — admins edit here directly. */
+    const content = masterResumeText.trim();
 
     const draft = await createTailoredResumeDraft({
       jobId,
@@ -330,8 +491,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         studentName: draft.studentName,
         companyName: draft.companyName,
         jobTitle: draft.jobTitle,
+        content: draft.content,
         downloadUrl: `/api/admin/jobs/${jobId}/tailor/${draft.id}/download`,
       },
+      analysis: toTailorApiAnalysis(analysis),
     });
   } catch (error) {
     return serverErrorResponse(error, 'Failed to generate tailored resume.');

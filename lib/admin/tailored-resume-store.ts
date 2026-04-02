@@ -40,6 +40,23 @@ export async function getTailoredResumeDraftById(id: string): Promise<TailoredRe
   return col.findOne({ id });
 }
 
+export async function updateTailoredResumeDraftContent(input: {
+  id: string;
+  content: string;
+}): Promise<TailoredResumeDraftRecord | null> {
+  const db = await getMongoDb();
+  const col = db.collection<TailoredResumeDraftRecord>(COLLECTION);
+  await col.updateOne(
+    { id: input.id },
+    {
+      $set: {
+        content: input.content,
+      },
+    }
+  );
+  return col.findOne({ id: input.id });
+}
+
 export async function listTailoredResumeDrafts(limit = 50): Promise<TailoredResumeDraftRecord[]> {
   const db = await getMongoDb();
   const col = db.collection<TailoredResumeDraftRecord>(COLLECTION);

@@ -1,12 +1,43 @@
 import { NextResponse } from 'next/server';
-import { Document, Packer, Paragraph, TextRun } from 'docx';
+import {
+  AlignmentType,
+  Document,
+  LineRuleType,
+  Packer,
+  Paragraph,
+  TextRun,
+} from 'docx';
 import { getTailoredResumeDraftById } from '@/lib/admin/tailored-resume-store';
+import { draftContentToPlainTextForDocx } from '@/lib/jobs/draft-html';
 import { jsonError, serverErrorResponse } from '@/lib/server/http';
 
 export const runtime = 'nodejs';
+
+/** ATS-oriented export: Garamond 11pt, black, left-aligned, simple body (no tables/shapes). */
 const RESUME_FONT = 'Garamond';
+/** docx `size` is half-points → 11pt */
 const RESUME_TEXT_SIZE = 22;
 const RESUME_TEXT_COLOR = '000000';
+/** Line spacing 1.2–1.5: AUTO rule uses line/240 as multiplier → 300 ≈ 1.236 */
+const ATS_LINE_SPACING = 300;
+const ATS_LINE_RULE = LineRuleType.AUTO;
+/** ~0.75" margins (1440 twips = 1"). Range 0.5–1" per ATS guidance. */
+const ATS_MARGIN_TWIP = 1080;
+
+function atsParagraphSpacing(isHeading: boolean) {
+  if (isHeading) {
+    return { before: 160, after: 72, line: ATS_LINE_SPACING, lineRule: ATS_LINE_RULE };
+  }
+  /** Minimal space-after so the doc doesn’t look “double-spaced” between lines. */
+  return { after: 0, line: ATS_LINE_SPACING, lineRule: ATS_LINE_RULE };
+}
+
+/** Achievement-style bullets typically start with a strong verb (not “Responsible for…”). */
+function startsWithExperienceActionVerb(text: string): boolean {
+  return /^(?:designed|developed|built|implemented|managed|led|created|improved|delivered|deployed|collaborated|supported|analyzed|optimized|integrated|engineered|established|executed|accelerated|streamlined|coordinated|reduced|increased|decreased|expanded|automated|spearheaded|drove|owned|maintained|enhanced|architected|refactored|migrated|trained|mentored|presented|researched|tested|documented|resolved|fixed|scaled|oversaw|directed|facilitated|planned|supervised|conducted|operated|programmed|shipped|launched|completed|secured|achieved|saved|generated|responsible)\b/i.test(
+    text.trim()
+  );
+}
 
 function toParagraphs(content: string): Paragraph[] {
   const lines = content.split('\n');
@@ -18,9 +49,18 @@ function toParagraphs(content: string): Paragraph[] {
     PROFESSIONALSUMMARY: 'PROFESSIONAL SUMMARY',
     EXPERIENCE: 'PROFESSIONAL EXPERIENCE',
     PROFESSIONALEXPERIENCE: 'PROFESSIONAL EXPERIENCE',
+    COMPANYEXPERIENCE: 'PROFESSIONAL EXPERIENCE',
+    WORKEXPERIENCE: 'PROFESSIONAL EXPERIENCE',
     TECHNICALSKILLS: 'TECHNICAL SKILLS',
     SKILLS: 'TECHNICAL SKILLS',
+    SOFTSKILLS: 'SOFT SKILLS',
+    PROJECTS: 'PROJECTS',
     EDUCATION: 'EDUCATION',
+    CERTIFICATIONS: 'CERTIFICATIONS',
+    CERTIFICATION: 'CERTIFICATIONS',
+    ACHIEVEMENTS: 'ACHIEVEMENTS',
+    VOLUNTEER: 'VOLUNTEER EXPERIENCE',
+    VOLUNTEERWORK: 'VOLUNTEER EXPERIENCE',
   };
 
   for (const raw of lines) {
@@ -28,7 +68,8 @@ function toParagraphs(content: string): Paragraph[] {
     if (!line) {
       paragraphs.push(
         new Paragraph({
-          spacing: { after: 80 },
+          alignment: AlignmentType.LEFT,
+          spacing: { after: 12, line: ATS_LINE_SPACING, lineRule: ATS_LINE_RULE },
           children: [
             new TextRun({
               text: '',
@@ -48,12 +89,13 @@ function toParagraphs(content: string): Paragraph[] {
     const normalizedHeading = headingMap[headingKey] || '';
     const isHeading = !isBullet && !!normalizedHeading;
     if (isHeading) currentSection = normalizedHeading;
-    const inExperienceSection =
-      currentSection === 'PROFESSIONAL EXPERIENCE' || currentSection === 'EXPERIENCE';
+    const inExperienceSection = currentSection === 'PROFESSIONAL EXPERIENCE';
     const inSummarySection =
       currentSection === 'PROFESSIONAL SUMMARY' || currentSection === 'SUMMARY';
     const inSkillsSection =
-      currentSection === 'TECHNICAL SKILLS' || currentSection === 'SKILLS';
+      currentSection === 'TECHNICAL SKILLS' ||
+      currentSection === 'SKILLS' ||
+      currentSection === 'SOFT SKILLS';
     const hasSentencePunctuation = /[.!?]$/.test(text);
     const hasActionVerb =
       /\b(designed|developed|built|implemented|managed|optimized|collaborated|supported|created|improved|integrated|troubleshot|engineered|led|delivered|deployed|analyzed)\b/i.test(
@@ -61,27 +103,44 @@ function toParagraphs(content: string): Paragraph[] {
       );
     const looksLikeDateRange =
       /\b(19|20)\d{2}\b/.test(text) &&
-      (/\b(Present|Current)\b/i.test(text) || /[-–]/.test(text));
+      (/\b(Present|Current|Now)\b/i.test(text) || /[-–—]/.test(text));
     const looksLikeCompanyLocationLine =
       !isHeading &&
-      !isBullet &&
       text.length < 80 &&
-      /^[A-Za-z .'-]+,\s*[A-Za-z .'-]+$/.test(text);
+      /^[A-Za-z .'&/-]+,\s*[A-Za-z .'&/-]+$/.test(text);
     const looksLikeRoleLine =
       !isHeading &&
-      !isBullet &&
-      text.length < 60 &&
-      /engineer|developer|analyst|manager|intern|scientist/i.test(text) &&
+      text.length < 72 &&
+      /engineer|developer|analyst|manager|intern|scientist|consultant|specialist|architect|lead|designer|associate|director|officer|coordinator|assistant|representative/i.test(
+        text
+      ) &&
       !hasSentencePunctuation;
+    /** Title | Company / Company — Role patterns are headers, not bullets. */
+    const looksLikeTitleCompanyPipe =
+      !isHeading && /\s\|\s/.test(text) && text.length < 120;
+    const looksLikeCompanyEmDash =
+      !isHeading && /^[A-Za-z0-9 &.'-]{2,50}\s*[—–-]\s*.+/u.test(text) && text.length < 120;
+    /** Job/company/header rows are usually compact; long lines are more likely real bullets. */
+    const isShortNonAchievementLine =
+      inExperienceSection &&
+      text.length <= 72 &&
+      !startsWithExperienceActionVerb(text) &&
+      !/^\d/.test(text.trim());
     const isExperienceMetaLine =
       inExperienceSection &&
-      (looksLikeDateRange || looksLikeCompanyLocationLine || (looksLikeRoleLine && !hasActionVerb));
+      (looksLikeDateRange ||
+        looksLikeCompanyLocationLine ||
+        (looksLikeRoleLine && !hasActionVerb) ||
+        looksLikeTitleCompanyPipe ||
+        looksLikeCompanyEmDash ||
+        isShortNonAchievementLine);
 
     if (!firstNonEmptySeen) {
       firstNonEmptySeen = true;
       paragraphs.push(
         new Paragraph({
-          spacing: { after: 120 },
+          alignment: AlignmentType.LEFT,
+          spacing: { after: 120, line: ATS_LINE_SPACING, lineRule: ATS_LINE_RULE },
           children: [
             new TextRun({
               text,
@@ -98,18 +157,31 @@ function toParagraphs(content: string): Paragraph[] {
 
     const shouldBulletizeSummary = !isHeading && !isBullet && inSummarySection;
     const shouldBulletizeSkills = !isHeading && !isBullet && inSkillsSection;
+    /** Experience: only bullet explicit list lines or clear achievement lines (not company/title blocks). */
     const shouldBulletizeExperience =
-      inExperienceSection && !isHeading && !isBullet && !isExperienceMetaLine;
+      inExperienceSection &&
+      !isHeading &&
+      !isExperienceMetaLine &&
+      (isBullet ||
+        startsWithExperienceActionVerb(text) ||
+        (text.length >= 56 && hasActionVerb) ||
+        /^\d/.test(text.trim()));
+    const stripListMarkerForPlainExperience =
+      inExperienceSection && isBullet && isExperienceMetaLine;
     const outputText = isHeading ? normalizedHeading : text;
+
+    const spacing = atsParagraphSpacing(isHeading);
+    const useBullet =
+      (isBullet && !stripListMarkerForPlainExperience) ||
+      (!isBullet && (shouldBulletizeSummary || shouldBulletizeSkills || shouldBulletizeExperience));
 
     paragraphs.push(
       new Paragraph({
-        ...((isBullet || shouldBulletizeSummary || shouldBulletizeSkills || shouldBulletizeExperience)
-          ? { bullet: { level: 0 } }
-          : {}),
+        alignment: AlignmentType.LEFT,
+        ...(useBullet ? { bullet: { level: 0 } } : {}),
         keepLines: isHeading || isExperienceMetaLine,
         keepNext: isHeading || isExperienceMetaLine,
-        spacing: isHeading ? { before: 180, after: 80, line: 240 } : { after: 70, line: 240 },
+        spacing,
         children: [
           new TextRun({
             text: outputText,
@@ -163,14 +235,14 @@ export async function GET(
           properties: {
             page: {
               margin: {
-                top: 1100,
-                right: 3200,
-                bottom: 1100,
-                left: 3200,
+                top: ATS_MARGIN_TWIP,
+                right: ATS_MARGIN_TWIP,
+                bottom: ATS_MARGIN_TWIP,
+                left: ATS_MARGIN_TWIP,
               },
             },
           },
-          children: toParagraphs(draft.content),
+          children: toParagraphs(draftContentToPlainTextForDocx(draft.content)),
         },
       ],
     });
