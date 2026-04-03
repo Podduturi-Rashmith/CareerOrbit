@@ -1,3 +1,7 @@
+import { getMongoDb } from '@/lib/db/mongodb';
+
+const COLLECTION = 'student_onboarding';
+
 export type WorkExperienceSubmission = {
   companyName: string;
   location: string;
@@ -33,49 +37,48 @@ export type StudentOnboardingSubmission = {
   workExperiences: WorkExperienceSubmission[];
 };
 
-const GLOBAL_STORE_KEY = '__careerorbit_student_onboarding_submissions__';
-
-type GlobalWithStore = typeof globalThis & {
-  [GLOBAL_STORE_KEY]?: StudentOnboardingSubmission[];
-};
-
-function getStore(): StudentOnboardingSubmission[] {
-  const g = globalThis as GlobalWithStore;
-  if (!g[GLOBAL_STORE_KEY]) g[GLOBAL_STORE_KEY] = [];
-  return g[GLOBAL_STORE_KEY]!;
+export async function listStudentOnboardingSubmissions(): Promise<StudentOnboardingSubmission[]> {
+  const db = await getMongoDb();
+  const docs = await db
+    .collection<StudentOnboardingSubmission>(COLLECTION)
+    .find({})
+    .sort({ submittedAt: -1 })
+    .toArray();
+  return docs.map(({ _id, ...rest }) => rest as StudentOnboardingSubmission);
 }
 
-export function listStudentOnboardingSubmissions(): StudentOnboardingSubmission[] {
-  return [...getStore()].sort((a, b) => b.submittedAt - a.submittedAt);
-}
-
-export function getStudentOnboardingByEmail(email: string): StudentOnboardingSubmission | null {
+export async function getStudentOnboardingByEmail(
+  email: string
+): Promise<StudentOnboardingSubmission | null> {
   const key = email.trim().toLowerCase();
   if (!key) return null;
-  const all = getStore();
-  const found = all.find(
-    (item) =>
-      item.submittedByEmail.toLowerCase() === key ||
-      item.resumeEmail.toLowerCase() === key
-  );
-  return found || null;
+  const db = await getMongoDb();
+  const doc = await db.collection<StudentOnboardingSubmission>(COLLECTION).findOne({
+    $or: [
+      { submittedByEmail: { $regex: `^${key}$`, $options: 'i' } },
+      { resumeEmail: { $regex: `^${key}$`, $options: 'i' } },
+    ],
+  });
+  if (!doc) return null;
+  const { _id, ...rest } = doc;
+  return rest as StudentOnboardingSubmission;
 }
 
-export function upsertStudentOnboardingSubmission(
+export async function upsertStudentOnboardingSubmission(
   submission: StudentOnboardingSubmission
-): StudentOnboardingSubmission {
-  const store = getStore();
+): Promise<StudentOnboardingSubmission> {
   const key = submission.submittedByEmail.trim().toLowerCase();
-  const existingIndex = store.findIndex(
-    (item) =>
-      item.submittedByEmail.toLowerCase() === key ||
-      item.resumeEmail.toLowerCase() === key
+  const db = await getMongoDb();
+  const col = db.collection<StudentOnboardingSubmission>(COLLECTION);
+  await col.updateOne(
+    {
+      $or: [
+        { submittedByEmail: { $regex: `^${key}$`, $options: 'i' } },
+        { resumeEmail: { $regex: `^${key}$`, $options: 'i' } },
+      ],
+    },
+    { $set: submission },
+    { upsert: true }
   );
-  if (existingIndex >= 0) {
-    store[existingIndex] = submission;
-  } else {
-    store.unshift(submission);
-  }
   return submission;
 }
-

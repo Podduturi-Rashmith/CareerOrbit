@@ -7,30 +7,36 @@ import {
 } from '@/lib/admin/student-onboarding-store';
 import { StudentOnboardingPayloadSchema } from '@/lib/admin/schemas';
 import { createEntityId } from '@/lib/shared/id';
-import { asTrimmedString, jsonError, parseJsonObject } from '@/lib/server/http';
+import { asTrimmedString, jsonError, parseJsonObject, serverErrorResponse } from '@/lib/server/http';
 
 export const runtime = 'nodejs';
 
 export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const scope = url.searchParams.get('scope');
-  if (scope === 'all') {
-    return NextResponse.json({ submissions: listStudentOnboardingSubmissions() });
-  }
+  try {
+    const url = new URL(request.url);
+    const scope = url.searchParams.get('scope');
+    if (scope === 'all') {
+      const submissions = await listStudentOnboardingSubmissions();
+      return NextResponse.json({ submissions });
+    }
 
-  const studentEmail = asTrimmedString(url.searchParams.get('studentEmail') || '');
-  if (!studentEmail) {
-    return NextResponse.json({ completed: false });
-  }
+    const studentEmail = asTrimmedString(url.searchParams.get('studentEmail') || '');
+    if (!studentEmail) {
+      return NextResponse.json({ completed: false });
+    }
 
-  const found = getStudentOnboardingByEmail(studentEmail);
-  return NextResponse.json({
-    completed: !!found,
-    submission: found || null,
-  });
+    const found = await getStudentOnboardingByEmail(studentEmail);
+    return NextResponse.json({
+      completed: !!found,
+      submission: found || null,
+    });
+  } catch (error) {
+    return serverErrorResponse(error, 'Failed to load onboarding data.');
+  }
 }
 
 export async function POST(request: Request) {
+  try {
   const payload = await parseJsonObject(request);
   if (!payload) {
     return jsonError('Invalid onboarding payload.', 400);
@@ -76,6 +82,9 @@ export async function POST(request: Request) {
     })),
   };
 
-  upsertStudentOnboardingSubmission(submission);
-  return NextResponse.json({ ok: true, id: submission.id });
+    await upsertStudentOnboardingSubmission(submission);
+    return NextResponse.json({ ok: true, id: submission.id });
+  } catch (error) {
+    return serverErrorResponse(error, 'Failed to save onboarding submission.');
+  }
 }
