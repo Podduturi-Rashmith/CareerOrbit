@@ -1,5 +1,5 @@
-import AdminDashboardV2 from '@/components/admin/AdminDashboard';
+import { redirect } from 'next/navigation';
 
 export default function AdminPage() {
-  return <AdminDashboardV2 />;
+  redirect('/admin/jobs');
 }

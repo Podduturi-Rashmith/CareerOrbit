@@ -83,7 +83,20 @@ const appearance = {
   },
 }
 
-export default function SignInPage() {
+export default async function SignInPage({ searchParams }: any) {
+  // Home passes `redirect_url=/admin/jobs` or `redirect_url=/dashboard`.
+  // Clerk's `forceRedirectUrl` needs to reflect that choice.
+  const sp = (await searchParams) ?? {}
+  const redirectFromQueryRaw = sp?.redirect_url
+  const redirectFromQuery = Array.isArray(redirectFromQueryRaw)
+    ? redirectFromQueryRaw[0]
+    : redirectFromQueryRaw
+
+  const safeRedirectUrl =
+    redirectFromQuery &&
+    (redirectFromQuery.startsWith('/admin') || redirectFromQuery.startsWith('/dashboard'))
+      ? redirectFromQuery
+      : '/dashboard'
   return (
     <div className="relative min-h-screen overflow-hidden" style={{ background: '#090c15' }}>
       {/* Dot grid */}
@@ -120,7 +133,7 @@ export default function SignInPage() {
           </p>
         </div>
 
-        <SignIn forceRedirectUrl="/dashboard" appearance={appearance} />
+        <SignIn forceRedirectUrl={safeRedirectUrl} appearance={appearance} />
 
         <p className="mt-8 text-[11px]" style={{ color: '#3d4e63' }}>
           Secured by Clerk · CareerOrbit Inc.

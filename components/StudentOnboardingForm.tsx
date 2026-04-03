@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useUser } from '@clerk/nextjs';
 import { CheckCircle2, Plus, Trash2 } from 'lucide-react';
 
 type WorkExperienceForm = {
@@ -27,6 +28,7 @@ const preferredRoles = [
 ];
 
 export default function StudentOnboardingForm({ onComplete }: OnboardingFormProps) {
+  const { user } = useUser();
   const [form, setForm] = useState({
     preferredName: '',
     dateOfBirth: '',
@@ -95,6 +97,7 @@ export default function StudentOnboardingForm({ onComplete }: OnboardingFormProp
 
       const payload = {
         ...form,
+        submittedByEmail: user?.primaryEmailAddress?.emailAddress || form.resumeEmail,
         workExperiences: workExperiences.map((item) => ({
           ...item,
           points: item.points

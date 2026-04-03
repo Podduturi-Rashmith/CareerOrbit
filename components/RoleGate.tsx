@@ -59,7 +59,7 @@ export default function RoleGate({
     if (expectedRole === 'admin') {
       router.replace('/access-denied?reason=admin-only&returnUrl=%2Fdashboard')
     } else {
-      router.replace('/admin')
+      router.replace('/admin/jobs')
     }
   }, [expectedRole, isAllowed, isLoaded, router])
 

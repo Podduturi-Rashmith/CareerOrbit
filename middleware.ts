@@ -22,10 +22,11 @@ export default clerkMiddleware(async (auth, req) => {
   const path = req.nextUrl.pathname
   const isAdmin = role === 'admin' || role === 'sub-admin'
   const isExplicitStudent = role === 'student'
+  const isStudentArea = path.startsWith('/dashboard')
 
-  // Admin hitting /dashboard → send to /admin
-  if (path.startsWith('/dashboard') && isAdmin) {
-    return NextResponse.redirect(new URL('/admin', req.url))
+  // Admin users should not stay in student dashboard routes.
+  if (isStudentArea && isAdmin) {
+    return NextResponse.redirect(new URL('/admin/jobs', req.url))
   }
 
   // Only block /admin if we KNOW they're a student (not if role is missing/stale JWT)

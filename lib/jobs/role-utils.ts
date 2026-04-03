@@ -34,17 +34,3 @@ export function classifyRoleFromText(title: string, description: string): JobRol
   return points > 0 ? winner : 'other';
 }
 
-export function roleLabel(role: JobRoleCategory): string {
-  switch (role) {
-    case 'software-engineer':
-      return 'Software Engineer';
-    case 'data-analyst':
-      return 'Data Analyst';
-    case 'java-developer':
-      return 'Java Developer';
-    case 'aiml':
-      return 'AI/ML';
-    default:
-      return 'Other';
-  }
-}

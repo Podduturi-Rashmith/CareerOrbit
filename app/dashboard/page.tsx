@@ -44,12 +44,13 @@ function DashboardContent() {
 
   const role = isLoaded ? (user?.publicMetadata?.role as string | undefined) : undefined;
   const isAdmin = role === 'admin' || role === 'sub-admin';
+  const isStudent = role === 'student';
 
   // Redirect admins — must know the role first
   React.useEffect(() => {
     if (!isLoaded) return;
-    if (isAdmin) router.replace('/admin');
-  }, [isLoaded, isAdmin, router]);
+    if (isAdmin && !isStudent) router.replace('/admin/jobs');
+  }, [isLoaded, isAdmin, isStudent, router]);
 
   // Only fetch applications once we know the user is a student
   React.useEffect(() => {
@@ -74,7 +75,9 @@ function DashboardContent() {
     if (!isLoaded || isAdmin) return;
     const loadOnboarding = async () => {
       try {
-        const response = await fetch('/api/student/onboarding', { credentials: 'include' });
+        const studentEmail = user?.primaryEmailAddress?.emailAddress;
+        const query = studentEmail ? `?studentEmail=${encodeURIComponent(studentEmail)}` : '';
+        const response = await fetch(`/api/student/onboarding${query}`, { credentials: 'include' });
         if (!response.ok) throw new Error('Failed to load onboarding');
         const data = await response.json();
         setOnboardingStatus(data.completed ? 'complete' : 'required');
@@ -83,7 +86,7 @@ function DashboardContent() {
       }
     };
     loadOnboarding().catch(() => setOnboardingStatus('required'));
-  }, [isLoaded, isAdmin]);
+  }, [isLoaded, isAdmin, user]);
 
   // Still figuring out who the user is — show nothing yet
   if (!isLoaded || isAdmin) {
