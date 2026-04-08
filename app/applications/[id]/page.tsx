@@ -131,11 +131,21 @@ export default function ApplicationDetailsPage() {
             </div>
             <div className="p-6 space-y-1">
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Resume Used</p>
-              <button className="flex items-center gap-2 text-indigo-600 font-medium hover:text-indigo-700">
-                <FileText className="w-4 h-4" />
-                Resume_v2.pdf
-                <Download className="w-3 h-3 ml-1" />
-              </button>
+              {app.resumeUrl ? (
+                <a
+                  href={app.resumeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download
+                  className="flex items-center gap-2 text-indigo-600 font-medium hover:text-indigo-700"
+                >
+                  <FileText className="w-4 h-4" />
+                  Download Resume
+                  <Download className="w-3 h-3 ml-1" />
+                </a>
+              ) : (
+                <p className="text-sm text-slate-400">Not ready yet</p>
+              )}
             </div>
             <div className="p-6 space-y-1">
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Last Updated</p>

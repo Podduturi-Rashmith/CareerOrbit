@@ -10,6 +10,12 @@ export type WorkExperienceSubmission = {
   points: string[];
 };
 
+export type JobPreferences = {
+  locations: string;       // free text e.g. "New York, Remote"
+  workMode: string;        // "Remote" | "Hybrid" | "On-site" | ""
+  employmentType: string;  // "Full-time" | "Part-time" | "Contract" | ""
+};
+
 export type StudentOnboardingSubmission = {
   id: string;
   submittedAt: number;
@@ -31,10 +37,17 @@ export type StudentOnboardingSubmission = {
   arrivalDate: string;
   certifications: string;
   preferredRole: string;
+  jobPreferences?: JobPreferences;
+  masterResumeUrl?: string;
+  masterResumeFileName?: string;
   consentAccepted: boolean;
   legalName: string;
   signedDate: string;
   workExperiences: WorkExperienceSubmission[];
+  // Wizard progress tracking
+  currentStep: number;        // 1-7, which step they are on
+  completedSteps: number[];   // array of completed step numbers
+  wizardCompleted: boolean;   // true only when step 7 (consent) is done
 };
 
 export async function listStudentOnboardingSubmissions(): Promise<StudentOnboardingSubmission[]> {
@@ -81,4 +94,85 @@ export async function upsertStudentOnboardingSubmission(
     { upsert: true }
   );
   return submission;
+}
+
+export async function patchStudentOnboardingStep(
+  email: string,
+  stepData: Partial<StudentOnboardingSubmission>
+): Promise<StudentOnboardingSubmission | null> {
+  const key = email.trim().toLowerCase();
+  const db = await getMongoDb();
+  const col = db.collection<StudentOnboardingSubmission>(COLLECTION);
+
+  const existing = await col.findOne({
+    $or: [
+      { submittedByEmail: { $regex: `^${key}$`, $options: 'i' } },
+      { resumeEmail: { $regex: `^${key}$`, $options: 'i' } },
+    ],
+  });
+
+  const now = Date.now();
+  const { createEntityId } = await import('@/lib/shared/id');
+
+  if (!existing) {
+    // First save — create the document
+    const doc: StudentOnboardingSubmission = {
+      id: createEntityId(),
+      submittedAt: now,
+      submittedByEmail: key,
+      preferredName: '',
+      dateOfBirth: '',
+      linkedInUrl: '',
+      resumeEmail: key,
+      resumePhone: '',
+      personalPhone: '',
+      address: '',
+      mastersUniversity: '',
+      mastersField: '',
+      mastersCompleted: '',
+      bachelorsUniversity: '',
+      bachelorsField: '',
+      bachelorsCompleted: '',
+      visaStatus: '',
+      arrivalDate: '',
+      certifications: '',
+      preferredRole: '',
+      consentAccepted: false,
+      legalName: '',
+      signedDate: '',
+      workExperiences: [],
+      currentStep: 1,
+      completedSteps: [],
+      wizardCompleted: false,
+      ...stepData,
+    };
+    await col.insertOne(doc);
+    return doc;
+  }
+
+  // Merge completed steps
+  const newCompleted = stepData.completedSteps
+    ? Array.from(new Set([...(existing.completedSteps ?? []), ...stepData.completedSteps]))
+    : existing.completedSteps ?? [];
+
+  const merged = {
+    ...stepData,
+    completedSteps: newCompleted,
+  };
+
+  await col.updateOne(
+    { _id: existing._id },
+    { $set: merged }
+  );
+
+  const updated = await col.findOne({ _id: existing._id });
+  if (!updated) return null;
+  const { _id, ...rest } = updated;
+  return rest as StudentOnboardingSubmission;
+}
+
+/** Returns true if the student has fully completed the wizard OR has the old consent-based completion */
+export function isOnboardingComplete(sub: StudentOnboardingSubmission | null): boolean {
+  if (!sub) return false;
+  return sub.wizardCompleted === true || sub.consentAccepted === true;
 }

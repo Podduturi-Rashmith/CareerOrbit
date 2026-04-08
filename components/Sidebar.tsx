@@ -9,6 +9,8 @@ import {
   FileText,
   ChevronRight,
   User,
+  CalendarDays,
+  FolderOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { adminPremiumUi } from '@/lib/admin/admin-theme';
@@ -44,10 +46,12 @@ const Sidebar = () => {
           ],
         },
         { name: 'Students', href: '/admin/students', icon: User },
+        { name: 'Files', href: '/admin/files', icon: FolderOpen },
       ]
     : [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Applications', href: '/applications', icon: Briefcase },
+        { name: 'Calendar', href: '/calendar', icon: CalendarDays },
         { name: 'Profile', href: '/profile', icon: User },
       ];
 

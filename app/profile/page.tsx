@@ -3,11 +3,13 @@
 import React from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import {
-  User, 
-  Mail, 
-  GraduationCap, 
-  BookOpen, 
-  Shield
+  User,
+  Mail,
+  GraduationCap,
+  BookOpen,
+  Shield,
+  FileText,
+  Download,
 } from 'lucide-react';
 
 export default function ProfilePage() {
@@ -27,6 +29,8 @@ function ProfileContent() {
     major: string | null;
     graduationYear: number | null;
     adminId: string | null;
+    masterResumeUrl: string | null;
+    masterResumeFileName: string | null;
   } | null>(null);
   const [loading, setLoading] = React.useState(true);
   const isStudent = profile?.role === 'student';
@@ -128,12 +132,36 @@ function ProfileContent() {
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="p-6 border-b border-slate-100">
                 <h3 className="text-lg font-bold text-slate-900">Base Resume On File</h3>
-                <p className="text-xs text-slate-500 mt-1">The auto-tailoring bot uses this as the starting resume before rewriting for each job.</p>
+                <p className="text-xs text-slate-500 mt-1">This is the resume CareerOrbit uses as the starting point when tailoring for each job.</p>
               </div>
-              <div className="p-6 space-y-4">
-                <p className="text-sm text-slate-600">
-                  Resume profile is now DB-backed. Student base resume upload/mapping can be connected in the next step.
-                </p>
+              <div className="p-6">
+                {isStudent && profile.masterResumeUrl ? (
+                  <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <FileText className="w-5 h-5 text-indigo-500" />
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{profile.masterResumeFileName || 'resume.docx'}</p>
+                        <p className="text-xs text-slate-500">Uploaded during onboarding</p>
+                      </div>
+                    </div>
+                    <a
+                      href={profile.masterResumeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download={profile.masterResumeFileName ?? undefined}
+                      className="flex items-center gap-1.5 rounded-lg bg-indigo-50 border border-indigo-100 px-3 py-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-100 transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Download
+                    </a>
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <FileText className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                    <p className="text-sm text-slate-500">No resume uploaded yet.</p>
+                    <p className="text-xs text-slate-400 mt-1">Complete your onboarding to upload your base resume.</p>
+                  </div>
+                )}
               </div>
             </div>
           )}

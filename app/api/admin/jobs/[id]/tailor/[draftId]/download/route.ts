@@ -10,6 +10,8 @@ import {
 import { getTailoredResumeDraftById } from '@/lib/admin/tailored-resume-store';
 import { draftContentToPlainTextForDocx } from '@/lib/jobs/draft-html';
 import { jsonError, serverErrorResponse } from '@/lib/server/http';
+import { uploadResume } from '@/lib/blob/resume-storage';
+import { getMongoDb } from '@/lib/db/mongodb';
 
 export const runtime = 'nodejs';
 
@@ -248,6 +250,23 @@ export async function GET(
     });
     const buffer = await Packer.toBuffer(document);
     const body = new Uint8Array(buffer);
+
+    // Auto-save to Vercel Blob and store URL back on the applied record
+    uploadResume(
+      draft.studentEmail,
+      draft.companyName,
+      draft.jobTitle,
+      filename,
+      Buffer.from(buffer)
+    ).then(async (blobUrl) => {
+      try {
+        const db = await getMongoDb();
+        await db.collection('admin_applied_records').updateOne(
+          { draftId },
+          { $set: { resumeBlobUrl: blobUrl } }
+        );
+      } catch { /* non-critical */ }
+    }).catch(() => { /* non-critical */ });
 
     return new NextResponse(body, {
       status: 200,

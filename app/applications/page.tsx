@@ -97,10 +97,20 @@ export default function ApplicationsPage() {
                       <StatusBadge status={app.status} />
                     </td>
                     <td className="px-6 py-4">
-                      <button className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-2 py-1 rounded-md border border-indigo-100">
-                        <Download className="w-3 h-3" />
-                        {app.resumeUrl ? 'Resume' : 'No Resume'}
-                      </button>
+                      {app.resumeUrl ? (
+                        <a
+                          href={app.resumeUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download
+                          className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-2 py-1 rounded-md border border-indigo-100"
+                        >
+                          <Download className="w-3 h-3" />
+                          Resume
+                        </a>
+                      ) : (
+                        <span className="text-xs text-slate-400">Not ready</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-500">{app.applicationDate}</td>
                     <td className="px-6 py-4 text-right">

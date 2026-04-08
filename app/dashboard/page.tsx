@@ -7,8 +7,10 @@ import { useUser } from '@clerk/nextjs';
 import { motion } from 'motion/react';
 import { ArrowUpRight, BriefcaseBusiness, CalendarClock, CircleDotDashed, ExternalLink, Trophy } from 'lucide-react';
 import DashboardLayout from '@/components/DashboardLayout';
-import StudentOnboardingForm from '@/components/StudentOnboardingForm';
+import StudentOnboardingWizard from '@/components/StudentOnboardingWizard';
 import type { StudentApplicationDto } from '@/lib/applications/serialize';
+import type { StudentOnboardingSubmission } from '@/lib/admin/student-onboarding-store';
+// Legacy form no longer used — wizard handles all new signups
 
 const statusStyles: Record<string, string> = {
   Applied: 'bg-sky-100 text-sky-800 border-sky-200',
@@ -41,6 +43,7 @@ function DashboardContent() {
   const [loading, setLoading] = React.useState(true);
   const isFirstWelcome = searchParams.get('welcome') === '1';
   const [onboardingStatus, setOnboardingStatus] = React.useState<'loading' | 'required' | 'complete'>('loading');
+  const [onboardingSubmission, setOnboardingSubmission] = React.useState<StudentOnboardingSubmission | null>(null);
 
   const role = isLoaded ? (user?.publicMetadata?.role as string | undefined) : undefined;
   const isAdmin = role === 'admin' || role === 'sub-admin';
@@ -80,6 +83,7 @@ function DashboardContent() {
         const response = await fetch(`/api/student/onboarding${query}`, { credentials: 'include' });
         if (!response.ok) throw new Error('Failed to load onboarding');
         const data = await response.json();
+        setOnboardingSubmission(data.submission ?? null);
         setOnboardingStatus(data.completed ? 'complete' : 'required');
       } catch {
         setOnboardingStatus('required');
@@ -102,7 +106,12 @@ function DashboardContent() {
   }
 
   if (onboardingStatus === 'required') {
-    return <StudentOnboardingForm onComplete={() => setOnboardingStatus('complete')} />;
+    return (
+      <StudentOnboardingWizard
+        initialSubmission={onboardingSubmission}
+        onComplete={() => setOnboardingStatus('complete')}
+      />
+    );
   }
 
   const stats = [
@@ -124,7 +133,7 @@ function DashboardContent() {
             <p className="text-xs uppercase tracking-[0.2em] text-slate-300 font-semibold">Student Workspace</p>
             <h1 className="mt-3 text-3xl md:text-4xl font-display font-black tracking-tight">
               {isFirstWelcome ? 'Welcome to CareerOrbit' : 'Welcome back'}
-              {`, Student`}
+              {`, ${onboardingSubmission?.preferredName || user?.firstName || 'there'}`}
             </h1>
             <p className="mt-3 text-slate-300 max-w-2xl">
               Stay consistent. Keep interviews prepared, follow up on screenings, and move each application to the next stage.
