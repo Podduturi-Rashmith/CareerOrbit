@@ -1,29 +1,28 @@
 import { NextResponse } from 'next/server';
-import { currentUser } from '@clerk/nextjs/server';
+import { auth } from '@clerk/nextjs/server';
 import {
   listAdminAppliedRecords,
   listAdminAppliedRecordsByEmail,
 } from '@/lib/admin/applied-records-store';
-import { serverErrorResponse } from '@/lib/server/http';
+import { asTrimmedString, serverErrorResponse } from '@/lib/server/http';
 
 export const runtime = 'nodejs';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const user = await currentUser();
-    if (!user) {
-      return NextResponse.json({ events: [], viewerRole: 'student' });
-    }
+    const { userId, sessionClaims } = await auth();
+    if (!userId) return NextResponse.json({ events: [], viewerRole: 'student' });
 
-    const role = (user.publicMetadata?.role as string | undefined) ?? '';
+    const role = (sessionClaims?.metadata as Record<string, string> | undefined)?.role ?? '';
     const isAdmin = role === 'admin' || role === 'sub-admin';
-    const email = user.emailAddresses[0]?.emailAddress ?? '';
+
+    const url = new URL(request.url);
+    const email = asTrimmedString(url.searchParams.get('email') || '');
 
     const records = isAdmin
       ? await listAdminAppliedRecords()
       : await listAdminAppliedRecordsByEmail(email);
 
-    // Only return records that have an upcoming event
     const events = records
       .filter((r) => r.upcomingEvent)
       .map((r) => ({

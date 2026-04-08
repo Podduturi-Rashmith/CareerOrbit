@@ -2,6 +2,7 @@
 
 import React from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
+import { useUser } from '@clerk/nextjs';
 import {
   User,
   Mail,
@@ -21,6 +22,7 @@ export default function ProfilePage() {
 }
 
 function ProfileContent() {
+  const { user, isLoaded } = useUser();
   const [profile, setProfile] = React.useState<{
     id: string;
     name: string;
@@ -37,9 +39,18 @@ function ProfileContent() {
   const isAdmin = profile?.role === 'admin';
 
   React.useEffect(() => {
+    if (!isLoaded) return;
     const loadProfile = async () => {
       try {
-        const response = await fetch('/api/student/profile', { credentials: 'include' });
+        const email = user?.primaryEmailAddress?.emailAddress ?? '';
+        const fullName =
+          [user?.firstName, user?.lastName].filter(Boolean).join(' ') ||
+          user?.username ||
+          email;
+        const params = new URLSearchParams();
+        if (email) params.set('email', email);
+        if (fullName) params.set('name', fullName);
+        const response = await fetch(`/api/student/profile?${params.toString()}`, { credentials: 'include' });
         if (!response.ok) throw new Error('Failed to load profile');
         const data = await response.json();
         setProfile(data.profile || null);
@@ -54,7 +65,7 @@ function ProfileContent() {
       setProfile(null);
       setLoading(false);
     });
-  }, []);
+  }, [isLoaded, user]);
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">

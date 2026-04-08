@@ -2,12 +2,13 @@
 
 import React from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
-import { 
+import {
   Download,
   ExternalLink,
   Filter,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useUser } from '@clerk/nextjs';
 import type { StudentApplicationDto } from '@/lib/applications/serialize';
 
 const StatusBadge = ({ status }: { status: string }) => {
@@ -28,13 +29,19 @@ const StatusBadge = ({ status }: { status: string }) => {
 };
 
 export default function ApplicationsPage() {
+  const { user, isLoaded } = useUser();
   const [applications, setApplications] = React.useState<StudentApplicationDto[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
+    if (!isLoaded) return;
     const loadApplications = async () => {
       try {
-        const response = await fetch('/api/student/applications', { credentials: 'include' });
+        const studentEmail = user?.primaryEmailAddress?.emailAddress ?? '';
+        const url = studentEmail
+          ? `/api/student/applications?email=${encodeURIComponent(studentEmail)}`
+          : '/api/student/applications';
+        const response = await fetch(url, { credentials: 'include' });
         if (!response.ok) throw new Error('Failed to load applications');
         const data = await response.json();
         setApplications(data.applications || []);
@@ -49,7 +56,7 @@ export default function ApplicationsPage() {
       setApplications([]);
       setLoading(false);
     });
-  }, []);
+  }, [isLoaded, user]);
 
   return (
     <DashboardLayout>

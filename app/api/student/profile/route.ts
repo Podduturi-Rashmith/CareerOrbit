@@ -1,43 +1,43 @@
 import { NextResponse } from 'next/server';
-import { currentUser } from '@clerk/nextjs/server';
+import { auth } from '@clerk/nextjs/server';
 import { getStudentOnboardingByEmail } from '@/lib/admin/student-onboarding-store';
-import { serverErrorResponse } from '@/lib/server/http';
+import { asTrimmedString, serverErrorResponse } from '@/lib/server/http';
 
 export const runtime = 'nodejs';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const user = await currentUser();
-    if (!user) {
+    const { userId, sessionClaims } = await auth();
+    if (!userId) {
       return NextResponse.json({ profile: null });
     }
 
-    const email = user.emailAddresses[0]?.emailAddress ?? '';
-    const role = (user.publicMetadata?.role as string | undefined) ?? '';
+    const url = new URL(request.url);
+    const email = asTrimmedString(url.searchParams.get('email') || '');
+    const name = asTrimmedString(url.searchParams.get('name') || '');
+    const role = (sessionClaims?.metadata as Record<string, string> | undefined)?.role ?? '';
     const isAdmin = role === 'admin' || role === 'sub-admin';
-    const fullName =
-      [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username || email;
 
     if (isAdmin) {
       return NextResponse.json({
         profile: {
-          id: user.id,
-          name: fullName,
+          id: userId,
+          name,
           email,
           role: 'admin',
           major: null,
           graduationYear: null,
-          adminId: user.id,
+          adminId: userId,
         },
       });
     }
 
-    const onboarding = await getStudentOnboardingByEmail(email);
+    const onboarding = email ? await getStudentOnboardingByEmail(email) : null;
 
     return NextResponse.json({
       profile: {
-        id: user.id,
-        name: onboarding?.preferredName || fullName,
+        id: userId,
+        name: onboarding?.preferredName || name,
         email,
         role: 'student',
         major: onboarding?.mastersField || onboarding?.bachelorsField || null,

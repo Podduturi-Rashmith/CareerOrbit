@@ -422,11 +422,12 @@ export default function StudentOnboardingWizard({
     setSaving(true);
     setError('');
     try {
+      const email = user?.primaryEmailAddress?.emailAddress ?? '';
       const res = await fetch('/api/student/onboarding', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ step, data: { ...data, ...extra } }),
+        body: JSON.stringify({ step, email, data: { ...data, ...extra } }),
       });
       if (!res.ok) {
         const d = await res.json();
@@ -469,6 +470,7 @@ export default function StudentOnboardingWizard({
     try {
       const form = new FormData();
       form.append('file', file);
+      form.append('email', user?.primaryEmailAddress?.emailAddress ?? '');
       const res = await fetch('/api/student/onboarding/resume', {
         method: 'POST',
         credentials: 'include',

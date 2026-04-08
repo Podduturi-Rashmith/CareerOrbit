@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
+import { useUser } from '@clerk/nextjs';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -38,6 +39,7 @@ interface CalendarEvent {
 type DateRangeFilter = 'all' | '7' | '30' | '90';
 
 export default function CalendarPage() {
+  const { user, isLoaded } = useUser();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -48,9 +50,12 @@ export default function CalendarPage() {
   const [dateRangeFilter, setDateRangeFilter] = useState<DateRangeFilter>('all');
 
   React.useEffect(() => {
+    if (!isLoaded) return;
     const loadEvents = async () => {
       try {
-        const response = await fetch('/api/student/calendar', { credentials: 'include' });
+        const studentEmail = user?.primaryEmailAddress?.emailAddress ?? '';
+        const query = studentEmail ? `?email=${encodeURIComponent(studentEmail)}` : '';
+        const response = await fetch(`/api/student/calendar${query}`, { credentials: 'include' });
         if (!response.ok) throw new Error('Failed to load events');
         const data = await response.json();
         setEvents(data.events || []);
@@ -66,7 +71,7 @@ export default function CalendarPage() {
       setEvents([]);
       setLoading(false);
     });
-  }, []);
+  }, [isLoaded, user]);
 
   const studentOptions = React.useMemo(() => {
     const map = new Map<string, string>();

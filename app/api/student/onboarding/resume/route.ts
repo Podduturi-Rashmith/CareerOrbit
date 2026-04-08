@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { currentUser } from '@clerk/nextjs/server';
+import { auth } from '@clerk/nextjs/server';
 import { put } from '@vercel/blob';
 import { patchStudentOnboardingStep } from '@/lib/admin/student-onboarding-store';
 import { jsonError, serverErrorResponse } from '@/lib/server/http';
@@ -8,11 +8,12 @@ export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
   try {
-    const user = await currentUser();
-    const email = user?.emailAddresses[0]?.emailAddress;
-    if (!email) return jsonError('Unauthorized', 401);
+    const { userId } = await auth();
+    if (!userId) return jsonError('Unauthorized', 401);
 
     const formData = await request.formData();
+    const email = (formData.get('email') as string | null)?.trim();
+    if (!email) return jsonError('Email is required', 400);
     const file = formData.get('file') as File | null;
     if (!file) return jsonError('No file provided', 400);
 

@@ -60,7 +60,11 @@ function DashboardContent() {
     if (!isLoaded || isAdmin) return;
     const loadApplications = async () => {
       try {
-        const response = await fetch('/api/student/applications', { credentials: 'include' });
+        const studentEmail = user?.primaryEmailAddress?.emailAddress ?? '';
+        const url = studentEmail
+          ? `/api/student/applications?email=${encodeURIComponent(studentEmail)}`
+          : '/api/student/applications';
+        const response = await fetch(url, { credentials: 'include' });
         if (!response.ok) throw new Error('Failed to load applications');
         const data = await response.json();
         setApplications(data.applications || []);
@@ -71,7 +75,7 @@ function DashboardContent() {
       }
     };
     loadApplications().catch(() => { setApplications([]); setLoading(false); });
-  }, [isLoaded, isAdmin]);
+  }, [isLoaded, isAdmin, user]);
 
   // Only check onboarding once we know the user is a student
   React.useEffect(() => {

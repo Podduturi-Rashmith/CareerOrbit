@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { currentUser } from '@clerk/nextjs/server';
+import { auth } from '@clerk/nextjs/server';
 import {
   getStudentOnboardingByEmail,
   isOnboardingComplete,
@@ -41,14 +41,15 @@ export async function GET(request: Request) {
 /** PATCH — save one step at a time from the wizard */
 export async function PATCH(request: Request) {
   try {
-    const user = await currentUser();
-    const email = user?.emailAddresses[0]?.emailAddress;
-    if (!email) return jsonError('Unauthorized', 401);
+    const { userId } = await auth();
+    if (!userId) return jsonError('Unauthorized', 401);
 
     const body = await parseJsonObject(request);
     if (!body) return jsonError('Invalid payload', 400);
 
-    const { step, data } = body as { step: number; data: Record<string, unknown> };
+    const { step, email: bodyEmail, data } = body as { step: number; email: string; data: Record<string, unknown> };
+    const email = asTrimmedString(bodyEmail);
+    if (!email) return jsonError('Email is required', 400);
     if (typeof step !== 'number' || step < 1 || step > 7) {
       return jsonError('step must be 1–7', 400);
     }

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useUser } from '@clerk/nextjs';
 import DashboardLayout from '@/components/DashboardLayout';
 import { 
   ArrowLeft, 
@@ -39,15 +40,19 @@ const StatusBadge = ({ status }: { status: string }) => {
 export default function ApplicationDetailsPage() {
   const params = useParams();
   const router = useRouter();
+  const { user, isLoaded } = useUser();
   const id = params.id as string;
 
   const [app, setApp] = React.useState<StudentApplicationDto | null>(null);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
+    if (!isLoaded) return;
     const loadApplication = async () => {
       try {
-        const response = await fetch(`/api/student/applications/${id}`, { credentials: 'include' });
+        const studentEmail = user?.primaryEmailAddress?.emailAddress ?? '';
+        const query = studentEmail ? `?email=${encodeURIComponent(studentEmail)}` : '';
+        const response = await fetch(`/api/student/applications/${id}${query}`, { credentials: 'include' });
         if (!response.ok) {
           setApp(null);
           return;
@@ -65,7 +70,7 @@ export default function ApplicationDetailsPage() {
       setApp(null);
       setLoading(false);
     });
-  }, [id]);
+  }, [id, isLoaded, user]);
 
   if (loading) {
     return (
