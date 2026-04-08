@@ -380,7 +380,7 @@ export default function StudentOnboardingWizard({
   initialSubmission: StudentOnboardingSubmission | null;
   onComplete: () => void;
 }) {
-  const { user } = useUser();
+  const { user, isLoaded } = useUser();
   const initialStep = initialSubmission?.currentStep ?? 1;
   const [currentStep, setCurrentStep] = React.useState(Math.min(initialStep, 7));
   const [completedSteps, setCompletedSteps] = React.useState<Set<number>>(
@@ -423,6 +423,10 @@ export default function StudentOnboardingWizard({
     setError('');
     try {
       const email = user?.primaryEmailAddress?.emailAddress ?? '';
+      if (!email) {
+        setError('Could not detect your email. Please refresh the page and try again.');
+        return false;
+      }
       const res = await fetch('/api/student/onboarding', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -594,7 +598,7 @@ export default function StudentOnboardingWizard({
               {/* Save & exit */}
               <button
                 onClick={() => saveStep(currentStep)}
-                disabled={saving}
+                disabled={saving || !isLoaded}
                 className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60 transition-colors"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin inline" /> : 'Save & Exit'}
@@ -612,7 +616,7 @@ export default function StudentOnboardingWizard({
               ) : (
                 <button
                   onClick={handleNext}
-                  disabled={saving}
+                  disabled={saving || !isLoaded}
                   className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-60 transition-colors"
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Save & Continue <ChevronRight className="w-4 h-4" /></>}
