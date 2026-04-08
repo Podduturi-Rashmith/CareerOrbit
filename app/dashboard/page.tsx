@@ -114,6 +114,7 @@ function DashboardContent() {
       <StudentOnboardingWizard
         initialSubmission={onboardingSubmission}
         onComplete={() => setOnboardingStatus('complete')}
+        studentEmail={user?.primaryEmailAddress?.emailAddress ?? ''}
       />
     );
   }

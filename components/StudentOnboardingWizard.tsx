@@ -376,11 +376,14 @@ function Step7Consent({ data, onChange }: { data: WizardData; onChange: (d: Wiza
 export default function StudentOnboardingWizard({
   initialSubmission,
   onComplete,
+  studentEmail = '',
 }: {
   initialSubmission: StudentOnboardingSubmission | null;
   onComplete: () => void;
+  studentEmail?: string;
 }) {
   const { user, isLoaded } = useUser();
+  const clerkEmail = user?.primaryEmailAddress?.emailAddress ?? studentEmail;
   const initialStep = initialSubmission?.currentStep ?? 1;
   const [currentStep, setCurrentStep] = React.useState(Math.min(initialStep, 7));
   const [completedSteps, setCompletedSteps] = React.useState<Set<number>>(
@@ -390,7 +393,7 @@ export default function StudentOnboardingWizard({
     legalName: '',
     preferredName: '',
     dateOfBirth: '',
-    resumeEmail: user?.primaryEmailAddress?.emailAddress ?? '',
+    resumeEmail: studentEmail || user?.primaryEmailAddress?.emailAddress || '',
     resumePhone: '',
     personalPhone: '',
     linkedInUrl: '',
@@ -422,7 +425,7 @@ export default function StudentOnboardingWizard({
     setSaving(true);
     setError('');
     try {
-      const email = user?.primaryEmailAddress?.emailAddress ?? '';
+      const email = clerkEmail;
       if (!email) {
         setError('Could not detect your email. Please refresh the page and try again.');
         return false;
@@ -474,7 +477,7 @@ export default function StudentOnboardingWizard({
     try {
       const form = new FormData();
       form.append('file', file);
-      form.append('email', user?.primaryEmailAddress?.emailAddress ?? '');
+      form.append('email', clerkEmail);
       const res = await fetch('/api/student/onboarding/resume', {
         method: 'POST',
         credentials: 'include',
