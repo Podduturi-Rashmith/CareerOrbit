@@ -383,7 +383,16 @@ export default function StudentOnboardingWizard({
   studentEmail?: string;
 }) {
   const { user, isLoaded } = useUser();
-  const clerkEmail = user?.primaryEmailAddress?.emailAddress ?? studentEmail;
+
+  // Use a ref so the email is captured once and never drifts back to empty
+  // during React/Clerk re-render cycles in dev or hydration.
+  const emailRef = React.useRef<string>(studentEmail);
+  React.useEffect(() => {
+    const resolved = user?.primaryEmailAddress?.emailAddress
+      || user?.emailAddresses?.[0]?.emailAddress
+      || studentEmail;
+    if (resolved) emailRef.current = resolved;
+  }, [user, studentEmail]);
   const initialStep = initialSubmission?.currentStep ?? 1;
   const [currentStep, setCurrentStep] = React.useState(Math.min(initialStep, 7));
   const [completedSteps, setCompletedSteps] = React.useState<Set<number>>(
@@ -425,7 +434,7 @@ export default function StudentOnboardingWizard({
     setSaving(true);
     setError('');
     try {
-      const email = clerkEmail;
+      const email = emailRef.current;
       if (!email) {
         setError('Could not detect your email. Please refresh the page and try again.');
         return false;
@@ -477,7 +486,7 @@ export default function StudentOnboardingWizard({
     try {
       const form = new FormData();
       form.append('file', file);
-      form.append('email', clerkEmail);
+      form.append('email', emailRef.current);
       const res = await fetch('/api/student/onboarding/resume', {
         method: 'POST',
         credentials: 'include',
